@@ -1,0 +1,41 @@
+---
+description: CloudEQ architecture, plane boundaries, and FOAP observability requirements
+alwaysApply: true
+---
+# CloudEQ project rules
+
+Apply these rules throughout this workspace. Keep this file's body synchronized with
+`.cursor/rules/cloudeq.mdc` (excluding that file's YAML frontmatter).
+
+## Scope and sources
+- This workspace starts as configuration only. Implement a plane only when the user requests it.
+- The stack is Python, FastAPI, CrewAI, Kafka, MongoDB, Docker, Grafana, and the Gemini API.
+- Read `docs/architecture/overview.md` and `docs/architecture/decisions.md` before implementation.
+- Consult the CloudEQ proposal and FOAP paper in `docs/references/` when available. They are currently missing; do not invent paper-specific requirements, citations, retention durations, or layer definitions.
+
+## Four decoupled planes
+- Plane 1 (`src/cloudeq/plane1_intake`): FastAPI/CLI intake, validation, Gemini feasibility routing, and task handoff.
+- Plane 2 (`src/cloudeq/plane2_agents`): CrewAI orchestration of requirements, planning, architecture, developer, tester, and DevOps agents; bounded Developer-Tester repair loops.
+- Plane 3 (`src/cloudeq/plane3_runtime`): isolated Docker execution, workspace management, execution policies, and test results.
+- Plane 4 (`src/cloudeq/plane4_observability`): Kafka ingestion, Gemini-assisted normalization, MongoDB storage, and Grafana-facing observability.
+- Planes communicate through explicit contracts and ports in `src/cloudeq/shared`; do not import another plane's internal implementations or couple them through database collections.
+- Keep shared code limited to configuration, contracts, and interfaces; use dependency injection for concrete adapters.
+- Telemetry originates from every plane; intake must be testable without Kafka, MongoDB, Docker, or live model credentials.
+
+## FOAP-aligned observability requirements
+- Accept heterogeneous telemetry payloads without requiring a source-specific schema at ingestion; validate the transport envelope, size, and safety limits separately.
+- Preserve the accepted raw event and source metadata before normalization; do not overwrite raw data with canonical output.
+- Maintain separate raw and canonical storage and independently configurable retention policies. No retention duration or destructive cleanup is approved by this scaffold.
+- Link canonical records to raw events with stable event IDs; propagate trace/correlation IDs across plane boundaries.
+- Version canonical schemas, validate normalized output, and retain normalization status/provenance. Retries and failures must not discard raw events.
+- Treat telemetry and model output as untrusted data. Exclude credentials from telemetry; define any required redaction before raw retention and document its provenance.
+
+## Implementation conventions
+- Use typed Python and explicit request/response contracts; keep domain logic independent of FastAPI, CrewAI, and storage adapters.
+- Read configuration from environment variables; keep secrets out of code, tests, logs, and version control. `.env.example` contains names and non-secret examples only.
+- Wrap Gemini behind an interface with an offline fake; configure model IDs explicitly rather than guessing a default.
+- Use bounded timeouts/retries, explicit errors, idempotent event handling, and structured logs with correlation IDs.
+- Keep generated-code execution inside restricted containers with resource/time limits and no host secrets; do not execute generated code on the host.
+- When implementing, add meaningful unit tests by plane and integration tests for boundaries; avoid live external services in unit tests.
+- Add dependencies and infrastructure configuration only when needed for the requested implementation step; record versions and decisions then.
+- Do not implement all planes, install dependencies, start services, or run a generation prompt merely because this scaffold exists.
