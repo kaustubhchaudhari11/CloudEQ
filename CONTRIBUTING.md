@@ -32,8 +32,10 @@ reported by `git rev-parse --show-toplevel` should be your CloudEQ folder.
 
 ## Verification and reference documents
 
-The current foundation contains no installed dependencies or test implementations.
-Add documented commands and meaningful checks with the relevant implementation.
+Configuration lives in `pyproject.toml` and `uv.lock`. Development tools install
+into the project-local `.venv` only. Application behavior is not implemented yet,
+so an empty pytest collection is not a product pass. Use the PowerShell commands
+in `README.md`. Add meaningful checks with the plane that implements the behavior.
 Do not add a CI workflow that reports success while skipping all real verification.
 
 Keep original proposal/paper files in `docs/references/` when supplied. Add accurate

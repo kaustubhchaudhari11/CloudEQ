@@ -1,0 +1,34 @@
+{
+  "documents": [
+    {
+      "source_filename": "CloudEQ.pdf",
+      "project_filename": "CloudEQ.pdf",
+      "sha256": "08bb7551c170f42724c30e6dfa9bae211151abcab837a5d5d050051796624dd7",
+      "kind": "original_pdf"
+    },
+    {
+      "source_filename": "A federated observability architecture pattern for reliable agentic AI.pdf",
+      "project_filename": "FOAP-paper.pdf",
+      "sha256": "faa16c954dc2005fcecf0eb3408dd16ba561f4267fa5da200b04104963160402",
+      "kind": "original_pdf"
+    },
+    {
+      "source_filename": "proposal.md",
+      "project_filename": "CloudEQ.extracted.md",
+      "sha256": "36066ef9bc80c454e81738c39a56359efebc31b0b1798414731a2032b853f0d2",
+      "kind": "mechanical_text_extract"
+    },
+    {
+      "source_filename": "foap.md",
+      "project_filename": "FOAP-paper.extracted.md",
+      "sha256": "bce0415468b17f8bd29185ba2f56a7ef891948770349dd3943785c2fcb0d9038",
+      "kind": "mechanical_text_extract"
+    },
+    {
+      "source_filename": "codex-clipboard-e3565727-064a-438d-b2e2-e2076d90630c.jpg",
+      "project_filename": "FORGE-SPAN-architecture.jpg",
+      "sha256": "9560fcf69d4c66edc098b001d31cb5522f8d333ee899f76474e1135148886459",
+      "kind": "original_diagram"
+    }
+  ]
+}

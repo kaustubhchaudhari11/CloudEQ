@@ -1,13 +1,13 @@
-# CloudEQ implementation prompt for Cursor
+# FORGE SPAN implementation prompt for Cursor
 
-Open `C:\Users\kaust\projects\CloudEQ\CloudEQ.code-workspace` in Cursor. First copy
-the original proposal, FOAP paper, and any assignment rubric into `docs/references/`
-and add them to the chat context. Paste the prompt below into Cursor Agent mode.
+Open `FORGE-SPAN.code-workspace` in the existing CloudEQ folder. The proposal, FOAP
+paper, diagram, and text companions are already in `docs/references/`. Add those
+references to chat context. No assignment rubric has been supplied. Paste the prompt below into Cursor Agent mode.
 This is a saved prompt only; it has not been executed during foundation setup.
 
 ---
 
-Act as the lead architect and implementation engineer for CloudEQ. Build this
+Act as the lead architect and implementation engineer for FORGE SPAN by Cloud EQ. Build this
 semester project from the existing foundation through a working, demonstrable MVP.
 I authorize implementation of all four planes in the sequence below, including
 project-local dependencies and development configuration. Inspect existing files
@@ -17,6 +17,7 @@ Do not stop after generating a plan or skeleton; implement and verify each miles
 ## Source requirements and working method
 
 1. Read the CloudEQ proposal, FOAP paper, any rubric in `docs/references/`, README,
+   the supplied architecture diagram and its text companion, project identity,
    and architecture notes. If the proposal or paper is missing or unreadable, ask
    me for it before claiming source compliance. You may continue independent
    foundation work with explicitly documented assumptions while awaiting sources.
