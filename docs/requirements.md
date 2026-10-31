@@ -3,9 +3,10 @@
 Product: **FORGE SPAN**. Team: **Cloud EQ**. Technical identifiers remain
 `CloudEQ`, `cloudeq`, and `CLOUDEQ_`.
 
-This document records requirement evidence and planned acceptance checks.
-It does not claim those checks have been executed. Configuration status is in
-`docs/implementation-status.md`. Contracts are in `docs/architecture/contracts.md`.
+This document records requirement evidence and acceptance checks.
+Plane 1 checks that now have automated tests are listed under traceability.
+Later planes are still planned. Status is in `docs/implementation-status.md`.
+Contracts are in `docs/architecture/contracts.md`.
 
 ## Sources actually read
 
@@ -48,7 +49,7 @@ FOAP's seven layers are Source systems, Source data, Streaming, Event-driven, Pr
 
 ## Requirements
 
-Acceptance checks are planned. None of the application checks have been run, because application behavior is not implemented.
+Acceptance checks for Planes 2–4 are planned. Plane 1 checks that have run are in the traceability section.
 
 | ID | Requirement | Source | Plane | Planned acceptance check |
 | --- | --- | --- | --- | --- |
@@ -94,6 +95,13 @@ Acceptance checks are planned. None of the application checks have been run, bec
 
 ## Traceability status
 
-Requirements R1–R30 are specified. No application test implements them yet.
-`tests/plane1`, `tests/plane2`, `tests/plane3`, `tests/plane4`, and `tests/integration`
-are placeholders. An empty test run is not evidence that these requirements pass.
+| ID | Plane 1 state |
+| --- | --- |
+| R2, R3 | API and CLI accept a non-empty prompt and reject a blank one. Tests cover both. |
+| R4 | GitHub Issues and Jira stay disabled. Tests reject those sources. The adapters are not implemented. |
+| R5, R6 | Offline routing is the default. Infeasible dataset checks and Gemini errors do not hand off. Tests use an injected client and do not call Gemini. |
+| R27 | Accepted, routed, and handed-off events share one `trace_id` and `task_id`. |
+| R28 | A source scan fails if Plane 1 imports Plane 2, 3, or 4. |
+| R29 | `uv run pytest` uses the offline router and in-memory ports. |
+| R30 | The intake sink rejects denied attribute keys and oversized payloads. Plane 4 raw retention is not implemented. |
+| R1, R7–R26 | Unchanged. They belong to later planes or to documentation already recorded. |
