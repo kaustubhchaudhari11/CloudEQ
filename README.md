@@ -67,9 +67,10 @@ attachments were not accessible during setup. See `docs/references/README.md`.
 Architecture notes distinguish recovered guidance from decisions still awaiting
 the original documents.
 
-When ready, supply the missing documents and use the implementation prompt in
-`docs/CURSOR_BUILD_PROMPT.md` in Cursor Agent mode. It covers the full project in
-ordered milestones, beginning with intake contracts and an offline router adapter.
+When ready, supply the missing documents and use `docs/CURSOR_START_PROMPT.md` in
+Cursor Agent mode for the first implementation session (foundation and Plane 1).
+The full-project prompt in `docs/CURSOR_BUILD_PROMPT.md` covers all five milestones.
+Both start with intake contracts and an offline router adapter.
 Application files such as `main.py`, `service.py`, `pyproject.toml`,
 Dockerfiles, Compose configuration, and test implementations are deliberately left
 for that implementation step. `.env.example` is a planning template, not a running
@@ -84,3 +85,13 @@ to your Cursor chat along with `docs/CURSOR_BUILD_PROMPT.md`. If Cursor cannot r
 PDF, provide an accurate text export alongside the original and identify its source.
 Files attached in a separate ChatGPT conversation are not automatically local files
 in this project. Never attach `.env` or API credentials as chat context.
+
+## GitHub and team contribution
+
+The private repository is [kaustubhchaudhari11/CloudEQ](https://github.com/kaustubhchaudhari11/CloudEQ).
+The CloudEQ folder has its own Git repository on `main`; it is independent of any
+repository in its parent directory. See `CONTRIBUTING.md` for task branches and
+pull-request review. A PR template is included under `.github/`.
+
+The selected model in Cursor writes project code; Gemini is the configured runtime
+provider for the project's future adapters. These are separate choices.
