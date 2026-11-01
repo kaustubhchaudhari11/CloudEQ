@@ -137,3 +137,37 @@ class EnvelopeRejected(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class RuntimeOperation(StrEnum):
+    WRITE_FILE = "write_file"
+    RUN_TESTS = "run_tests"
+    GIT_COMMIT = "git_commit"
+
+
+class ExecutionRequest(BaseModel):
+    """One sandbox operation. Plane 2 sends it; Plane 3 will execute it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str
+    trace_id: str
+    operation: RuntimeOperation
+    iteration: int | None = None
+
+
+class ExecutionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str
+    trace_id: str
+    operation: RuntimeOperation
+    exit_code: int
+    timed_out: bool = False
+    passed: bool | None = None
+    stdout: str = ""
+    stderr: str = ""
+    duration_ms: int = 0
+    artifact_refs: list[str] = Field(default_factory=list)
+    simulation: bool
+    host_execution: bool = False

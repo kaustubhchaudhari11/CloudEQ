@@ -1,8 +1,10 @@
 # Plane 1 HTTP contract
 
 FORGE SPAN intake by Cloud EQ. These routes validate and route a prompt.
-`handed_off` means the in-memory Plane 2 port accepted the contract.
-It does not mean an agent ran, a container started, or a commit was made.
+`handed_off` means the configured handoff port accepted the contract.
+The default port stores that contract in memory. An injected Plane 2 supervisor
+can record an offline simulation and still returns `execution_started` false.
+Neither path means a live agent ran, a container started, or a commit was made.
 `execution_started` is false for every Plane 1 response.
 
 The API reads process environment variables. When `.env` exists, the API and CLI

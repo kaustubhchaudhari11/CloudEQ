@@ -1,0 +1,401 @@
+"""Supervisor for the six SDLC stages and the bounded Developer–Tester loop."""
+
+import logging
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+from cloudeq.plane2_agents.agents.crewai import CrewAIAdapter, CrewAINotExecuted
+from cloudeq.plane2_agents.agents.offline import OfflineStageWorker
+from cloudeq.plane2_agents.config_loader import (
+    DEFAULT_AGENTS_CONFIG,
+    AgentConfigError,
+    load_agent_team,
+)
+from cloudeq.plane2_agents.models import (
+    PREPARATION_STAGES,
+    AgentRunResult,
+    RepairIteration,
+    RepairState,
+    StageName,
+    StageOutput,
+)
+from cloudeq.plane2_agents.runtime_sim import RuntimeExecutionError
+from cloudeq.shared.contracts.models import (
+    ExecutionRequest,
+    ExecutionResult,
+    HandoffRequest,
+    PlaneName,
+    RuntimeOperation,
+    TelemetryEnvelope,
+)
+from cloudeq.shared.ports.protocols import RuntimeExecutor, TelemetrySink
+
+logger = logging.getLogger(__name__)
+
+
+class CancelToken:
+    def __init__(self) -> None:
+        self.cancelled = False
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+
+class Supervisor:
+    def __init__(
+        self,
+        *,
+        config_path: Path | None = None,
+        runtime: RuntimeExecutor,
+        sink: TelemetrySink,
+        max_iterations: int = 3,
+        engine: str = "offline",
+        token: CancelToken | None = None,
+        worker: OfflineStageWorker | None = None,
+        crewai: CrewAIAdapter | None = None,
+    ) -> None:
+        self._config_path = config_path or DEFAULT_AGENTS_CONFIG
+        self._runtime = runtime
+        self._sink = sink
+        self._max_iterations = max_iterations
+        self._engine = engine
+        self._token = token or CancelToken()
+        self._worker = worker or OfflineStageWorker()
+        self._crewai = crewai or CrewAIAdapter()
+
+    @property
+    def token(self) -> CancelToken:
+        return self._token
+
+    def run(self, handoff: HandoffRequest) -> AgentRunResult:
+        if self._max_iterations < 1:
+            return self._finish(
+                handoff,
+                state=RepairState.ERROR,
+                stages=[],
+                iterations=[],
+                devops_ran=False,
+                reason="Repair maximum must be at least 1.",
+                simulation=self._engine == "offline",
+                engine=self._engine_label(),
+            )
+        try:
+            team = load_agent_team(self._config_path)
+        except AgentConfigError as exc:
+            return self._finish(
+                handoff,
+                state=RepairState.ERROR,
+                stages=[],
+                iterations=[],
+                devops_ran=False,
+                reason=exc.reason,
+                simulation=False,
+                engine=self._engine_label(),
+            )
+        if self._engine == "crewai":
+            try:
+                self._crewai.execute(team)
+            except CrewAINotExecuted as exc:
+                return self._finish(
+                    handoff,
+                    state=RepairState.ERROR,
+                    stages=[],
+                    iterations=[],
+                    devops_ran=False,
+                    reason=exc.reason,
+                    simulation=False,
+                    engine="crewai-not-executed",
+                )
+        if self._token.cancelled:
+            return self._finish(
+                handoff,
+                state=RepairState.CANCELLED,
+                stages=[],
+                iterations=[],
+                devops_ran=False,
+                reason="Cancelled before the first stage.",
+                simulation=True,
+                engine="offline-simulation",
+            )
+
+        stages: list[StageOutput] = []
+        for stage in PREPARATION_STAGES:
+            if self._token.cancelled:
+                return self._finish(
+                    handoff,
+                    state=RepairState.CANCELLED,
+                    stages=stages,
+                    iterations=[],
+                    devops_ran=False,
+                    reason=f"Cancelled before {stage.value}.",
+                    simulation=True,
+                    engine="offline-simulation",
+                )
+            stages.append(
+                self._record_stage(handoff, stage, self._worker.summarize(stage, handoff.prompt))
+            )
+
+        iterations: list[RepairIteration] = []
+        state = RepairState.RUNNING
+        reason = ""
+        for iteration in range(1, self._max_iterations + 1):
+            if self._token.cancelled:
+                state = RepairState.CANCELLED
+                reason = "Cancelled before the next repair iteration."
+                break
+            try:
+                written = self._runtime.execute(
+                    ExecutionRequest(
+                        task_id=handoff.task_id,
+                        trace_id=handoff.trace_id,
+                        operation=RuntimeOperation.WRITE_FILE,
+                        iteration=iteration,
+                    )
+                )
+                if written.host_execution:
+                    raise RuntimeExecutionError(
+                        "Runtime reported host execution. Generated code must stay off the host."
+                    )
+                if (
+                    written.task_id != handoff.task_id
+                    or written.trace_id != handoff.trace_id
+                    or written.operation is not RuntimeOperation.WRITE_FILE
+                    or written.host_execution
+                    or written.timed_out
+                    or written.exit_code != 0
+                    or written.passed is not None
+                    or not written.simulation
+                ):
+                    raise RuntimeExecutionError("Runtime returned an unusable developer result.")
+                tested = self._runtime.execute(
+                    ExecutionRequest(
+                        task_id=handoff.task_id,
+                        trace_id=handoff.trace_id,
+                        operation=RuntimeOperation.RUN_TESTS,
+                        iteration=iteration,
+                    )
+                )
+            except RuntimeExecutionError as exc:
+                return self._finish(
+                    handoff,
+                    state=RepairState.ERROR,
+                    stages=stages,
+                    iterations=iterations,
+                    devops_ran=False,
+                    reason=exc.reason,
+                    simulation=True,
+                    engine="offline-simulation",
+                )
+            host_result = self._reject_host_execution(handoff, stages, iterations, written, tested)
+            if host_result is not None:
+                return host_result
+            if (
+                written.task_id != handoff.task_id
+                or tested.task_id != handoff.task_id
+                or written.trace_id != handoff.trace_id
+                or tested.trace_id != handoff.trace_id
+                or written.operation is not RuntimeOperation.WRITE_FILE
+                or tested.operation is not RuntimeOperation.RUN_TESTS
+                or written.timed_out
+                or tested.timed_out
+                or written.exit_code != 0
+                or written.passed is not None
+                or tested.passed is None
+                or (tested.passed is True and tested.exit_code != 0)
+                or (tested.passed is False and tested.exit_code == 0)
+                or not written.simulation
+                or not tested.simulation
+            ):
+                return self._finish(
+                    handoff,
+                    state=RepairState.ERROR,
+                    stages=stages,
+                    iterations=iterations,
+                    devops_ran=False,
+                    reason="Runtime returned an unusable or mismatched developer or tester result.",
+                    simulation=True,
+                    engine="offline-simulation",
+                )
+            passed = tested.passed
+            diff_summary = (
+                written.artifact_refs[0]
+                if written.artifact_refs
+                else self._worker.diff_summary(handoff.task_id, iteration)
+            )
+            feedback = tested.stdout or tested.stderr
+            final_reason = None
+            if passed:
+                final_reason = f"Tests passed on iteration {iteration}."
+            elif self._token.cancelled:
+                final_reason = "Cancelled after a failing test."
+            elif iteration == self._max_iterations:
+                final_reason = f"Repair budget of {self._max_iterations} iterations was exhausted."
+            record = RepairIteration(
+                iteration=iteration,
+                trace_id=handoff.trace_id,
+                diff_summary=diff_summary,
+                tester_feedback=feedback,
+                passed=passed,
+                termination_reason=final_reason,
+            )
+            iterations.append(record)
+            self._emit(
+                handoff,
+                "agents.repair_iteration",
+                {
+                    "iteration": iteration,
+                    "passed": passed,
+                    "trace_id": handoff.trace_id,
+                    "termination_reason": final_reason,
+                },
+            )
+            self._emit(
+                handoff,
+                "agents.test_result",
+                {"iteration": iteration, "passed": passed, "feedback": feedback},
+            )
+            if passed:
+                state = RepairState.PASSED
+                reason = final_reason or "Tests passed."
+                break
+            if self._token.cancelled:
+                state = RepairState.CANCELLED
+                reason = final_reason or "Cancelled after a failing test."
+                break
+            if iteration == self._max_iterations:
+                state = RepairState.FAILED_BUDGET_EXHAUSTED
+                reason = final_reason or "Repair budget was exhausted."
+
+        if iterations:
+            stages.append(
+                self._record_stage(handoff, StageName.DEVELOPMENT, iterations[-1].diff_summary)
+            )
+            stages.append(
+                self._record_stage(handoff, StageName.TESTING, iterations[-1].tester_feedback)
+            )
+        devops_ran = False
+        if state is RepairState.PASSED:
+            if self._token.cancelled:
+                state = RepairState.CANCELLED
+                reason = "Cancelled before DevOps."
+            else:
+                stages.append(
+                    self._record_stage(
+                        handoff,
+                        StageName.DEVOPS,
+                        "DevOps accepted the passing test result. No host command was run.",
+                    )
+                )
+                devops_ran = True
+        return self._finish(
+            handoff,
+            state=state,
+            stages=stages,
+            iterations=iterations,
+            devops_ran=devops_ran,
+            reason=reason,
+            simulation=True,
+            engine="offline-simulation",
+        )
+
+    def _record_stage(self, handoff: HandoffRequest, stage: StageName, summary: str) -> StageOutput:
+        output = StageOutput(
+            stage=stage,
+            trace_id=handoff.trace_id,
+            summary=summary,
+            simulation=True,
+        )
+        self._emit(
+            handoff,
+            "agents.stage_completed",
+            {"stage": stage.value, "trace_id": handoff.trace_id},
+        )
+        self._emit(
+            handoff,
+            "agents.decision",
+            {"stage": stage.value, "summary": summary, "simulation": True},
+        )
+        logger.info(
+            "stage completed",
+            extra={"trace_id": handoff.trace_id, "task_id": handoff.task_id, "status": stage.value},
+        )
+        return output
+
+    def _reject_host_execution(
+        self,
+        handoff: HandoffRequest,
+        stages: list[StageOutput],
+        iterations: list[RepairIteration],
+        written: ExecutionResult,
+        tested: ExecutionResult,
+    ) -> AgentRunResult | None:
+        if written.host_execution or tested.host_execution:
+            return self._finish(
+                handoff,
+                state=RepairState.ERROR,
+                stages=stages,
+                iterations=iterations,
+                devops_ran=False,
+                reason="Runtime reported host execution. Generated code must stay off the host.",
+                simulation=True,
+                engine="offline-simulation",
+            )
+        return None
+
+    def _finish(
+        self,
+        handoff: HandoffRequest,
+        *,
+        state: RepairState,
+        stages: list[StageOutput],
+        iterations: list[RepairIteration],
+        devops_ran: bool,
+        reason: str,
+        simulation: bool,
+        engine: str,
+    ) -> AgentRunResult:
+        result = AgentRunResult(
+            task_id=handoff.task_id,
+            trace_id=handoff.trace_id,
+            state=state,
+            stages=stages,
+            iterations=iterations,
+            devops_ran=devops_ran,
+            simulation=simulation,
+            live_crewai=False,
+            live_gemini=False,
+            host_execution=False,
+            termination_reason=reason,
+            engine=engine,
+        )
+        self._emit(
+            handoff,
+            "agents.run_finished",
+            {
+                "state": state.value,
+                "devops_ran": devops_ran,
+                "iterations": len(iterations),
+                "simulation": simulation,
+                "live_crewai": False,
+                "reason": reason,
+            },
+        )
+        return result
+
+    def _emit(self, handoff: HandoffRequest, event_name: str, payload: dict[str, object]) -> None:
+        envelope = TelemetryEnvelope(
+            event_id=str(uuid4()),
+            trace_id=handoff.trace_id,
+            source=PlaneName.PLANE2_AGENTS,
+            event_name=event_name,
+            occurred_at=datetime.now(UTC),
+            payload=payload,
+            task_id=handoff.task_id,
+        )
+        self._sink.emit(envelope)
+
+    def _engine_label(self) -> str:
+        if self._engine == "crewai":
+            return "crewai-not-executed"
+        return "offline-simulation"

@@ -3,6 +3,7 @@
 from cloudeq.shared.ports.protocols import (
     FeasibilityRouter,
     GeminiTransport,
+    RuntimeExecutor,
     TaskHandoff,
     TelemetrySink,
 )
@@ -10,6 +11,7 @@ from cloudeq.shared.ports.protocols import (
 __all__ = [
     "FeasibilityRouter",
     "GeminiTransport",
+    "RuntimeExecutor",
     "TaskHandoff",
     "TelemetrySink",
 ]

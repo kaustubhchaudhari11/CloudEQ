@@ -3,6 +3,8 @@
 from cloudeq.shared.contracts.models import (
     DatasetCheck,
     EnvelopeRejected,
+    ExecutionRequest,
+    ExecutionResult,
     FeasibilityResult,
     FeasibilityStatus,
     HandoffAcknowledgement,
@@ -10,6 +12,7 @@ from cloudeq.shared.contracts.models import (
     PlaneName,
     RouterKind,
     RoutingRequest,
+    RuntimeOperation,
     SubmissionSource,
     TaskResult,
     TaskStatus,
@@ -20,6 +23,8 @@ from cloudeq.shared.contracts.models import (
 __all__ = [
     "DatasetCheck",
     "EnvelopeRejected",
+    "ExecutionRequest",
+    "ExecutionResult",
     "FeasibilityResult",
     "FeasibilityStatus",
     "HandoffAcknowledgement",
@@ -27,6 +32,7 @@ __all__ = [
     "PlaneName",
     "RouterKind",
     "RoutingRequest",
+    "RuntimeOperation",
     "SubmissionSource",
     "TaskResult",
     "TaskStatus",

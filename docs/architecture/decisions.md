@@ -42,7 +42,7 @@ and is not the configured target.
 
 Packaging uses `pyproject.toml`, the existing `src/cloudeq` layout, and uv.
 The lockfile is `uv.lock`. The environment is the project-local `.venv`, which
-Git ignores. Development dependencies are pytest, Ruff, and mypy only.
+Git ignores. Development dependencies are pytest, Ruff, mypy, and types-PyYAML.
 
 Plane 1 installed, from PyPI on 2026-10-31, and locked in `uv.lock`:
 
@@ -54,8 +54,15 @@ Plane 1 installed, from PyPI on 2026-10-31, and locked in `uv.lock`:
 
 The Gemini router uses the official `models.generateContent` REST method on
 `generativelanguage.googleapis.com` with an injected HTTP client. No Gemini SDK
-is installed. CrewAI, PyMongo, and confluent-kafka remain candidates for later
-planes and are not installed.
+is installed. PyMongo and confluent-kafka remain candidates for Plane 4 and are
+not installed.
+
+Plane 2 installed PyYAML 6.0.3 and the dev stub package types-PyYAML
+6.0.12.20261030 so `agents.yaml` can be parsed and type-checked. CrewAI 1.15.33
+stays compatible with this Python window and is not installed. The default
+engine is `offline`: a labeled simulation. `CLOUDEQ_AGENT_ENGINE=crewai`
+prepares the six role names and raises before kickoff. That refusal is not a
+successful crew and is not evidence that CrewAI or Gemini ran.
 
 ### Runtime and storage
 
@@ -90,8 +97,10 @@ Flash as the prototype normalizer. That is evidence, not this project's model ID
 ### Contracts
 
 Shared types and ports are specified in `docs/architecture/contracts.md`.
-Requirements and planned checks are in `docs/requirements.md`.
-Python modules under `src/cloudeq` remain package markers.
+Requirements and checks are in `docs/requirements.md`.
+Plane 1 and Plane 2 contain application code. Plane 3 and Plane 4 remain
+package markers. `RuntimeExecutor` is the only path from the supervisor to a
+sandbox. The current implementation is `OfflineRuntimeSimulation`.
 
 ## Still unresolved
 

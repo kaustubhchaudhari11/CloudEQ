@@ -1,0 +1,20 @@
+version: 1
+roles:
+  - name: Requirements
+    diagram_label: Requirements
+    goal: Turn the accepted prompt into testable requirements.
+  - name: Planning
+    diagram_label: Planner
+    goal: Order the work the later stages will carry out.
+  - name: Architecture
+    diagram_label: Architect
+    goal: Choose a structure the developer can implement.
+  - name: Development
+    diagram_label: Developer
+    goal: Produce a diff and submit it to the tester.
+  - name: Testing
+    diagram_label: QA tester
+    goal: Return pass or fail with trace feedback. A pass is required before DevOps.
+  - name: DevOps
+    diagram_label: DevOps
+    goal: Record a release decision only after testing has passed.
