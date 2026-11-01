@@ -12,10 +12,11 @@ provider. This project does not replace Gemini with Grok.
 
 ## Setup status
 
-Configuration is in place: requirements, contracts, environment names, Python
-packaging, and a project-local development environment. Application routes,
-agents, containers, brokers, databases, and dashboards are not implemented.
-No live Gemini call is made by this repository.
+Configuration and Plane 1 intake are in place. The API and CLI validate a prompt,
+route it with the offline feasibility adapter, and hand a feasible task to an
+in-memory Plane 2 port. That handoff does not run agents or containers.
+Planes 2–4, Kafka, MongoDB, Docker, and Grafana are not implemented.
+Live Gemini calls stay disabled.
 
 Open this folder in Cursor, or open `FORGE-SPAN.code-workspace`. The always-applied
 rule is `.cursor/rules/cloudeq.mdc`. `.cursorrules` carries the same guidance.
@@ -107,32 +108,62 @@ uv run mypy
 uv run pytest
 ```
 
-`uv sync` creates `.venv` in this folder and installs the package plus pytest,
-Ruff, and mypy. It does not install FastAPI, CrewAI, Kafka, MongoDB, Docker, or
-Grafana, and it does not call Gemini.
+`uv sync` creates `.venv` in this folder and installs the package, FastAPI,
+Uvicorn, httpx, pytest, Ruff, and mypy. It does not install CrewAI, a Kafka
+client, MongoDB, Docker, or Grafana, and it does not call Gemini.
 
-Expected configuration results:
+Expected results on this machine:
 
 - `git rev-parse --show-toplevel` prints `C:/Users/kaust/projects/CloudEQ`.
 - Python is 3.12.x and below 3.14. This machine used 3.12.2.
 - `imports-ok` prints after the import command.
-- Ruff and mypy exit 0 while the packages stay empty of application code.
-- `uv run pytest` exits 5 and reports no tests collected. That is expected.
-  It is not evidence that FORGE SPAN behaves correctly.
+- Ruff and mypy exit 0.
+- `uv run pytest` exits 0. Plane 1 tests pass without live services. A passing
+  test is not evidence that Planes 2–4 or a live Gemini call work.
 
 If `uv` is missing, install it from [Astral's uv documentation](https://docs.astral.sh/uv/getting-started/installation/) and open a new shell. If `py -3.12` fails, install CPython 3.12. The project rejects 3.14 because current CrewAI does not support it. Library versions and that constraint are in `docs/architecture/decisions.md`.
 
-Copy `.env.example` to `.env` only when a later session needs local settings.
-Leave secrets empty and leave `CLOUDEQ_GEMINI_LIVE_CALLS=false` until model IDs
-are chosen deliberately.
+Copy `.env.example` to `.env` only for local settings. Leave secrets empty and
+leave `CLOUDEQ_GEMINI_LIVE_CALLS=false` until a model ID is chosen deliberately.
+The HTTP shapes are in `docs/plane1-http.md`.
+
+## Offline Plane 1 demo
+
+Run this from the repository root. It does not call Gemini.
+
+```powershell
+Set-Location C:\Users\kaust\projects\CloudEQ
+$env:CLOUDEQ_ROUTER_MODE = "offline"
+$env:CLOUDEQ_GEMINI_LIVE_CALLS = "false"
+$env:GEMINI_API_KEY = ""
+$env:GEMINI_ROUTER_MODEL = ""
+uv run cloudeq-intake submit --prompt "Add a health check"
+uv run uvicorn cloudeq.plane1_intake.api.app:app --host 127.0.0.1 --port 8000
+```
+
+In a second shell, with the server still running:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+$body = @{ source = "api"; prompt = "Add a health check" } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8000/tasks -Method Post -ContentType "application/json" -Body $body
+```
+
+`status` `handed_off` and `execution_started` `$false` mean the task was accepted
+for a later plane. They do not mean code was generated. Stop the server with Ctrl+C.
+A blank prompt exits the CLI with code 2. A named dataset is routed as infeasible:
+
+```powershell
+uv run cloudeq-intake submit --prompt "Use the corpus" --dataset "corpus-v1"
+```
 
 ## Roadmap
 
-Status and the ordered plane plan are in `docs/implementation-status.md`.
+Status is in `docs/implementation-status.md`.
 
-1. Configuration — this repository state.
-2. Plane 1, intake — next session.
-3. Plane 2, agent orchestration.
+1. Configuration — done.
+2. Plane 1, intake — offline API and CLI are implemented. Ticket adapters are not.
+3. Plane 2, agent orchestration — next. Use `docs/CURSOR_BUILD_PROMPT.md` milestone 2.
 4. Plane 3, sandboxed execution.
 5. Plane 4, observability.
 6. Integration and demonstration.
@@ -140,8 +171,7 @@ Status and the ordered plane plan are in `docs/implementation-status.md`.
 ## GitHub and team contribution
 
 The private repository is [kaustubhchaudhari11/CloudEQ](https://github.com/kaustubhchaudhari11/CloudEQ).
-This folder is its own Git repository on a configuration branch until that work
-is reviewed. It is independent of any repository in the parent directory. See
+Plane 1 work is on `feature/plane1-intake` and is not pushed by this session. It is independent of any repository in the parent directory. See
 `CONTRIBUTING.md`. A pull-request template is under `.github/`.
 
 Do not rename the GitHub repository to match the product name.

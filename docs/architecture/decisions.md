@@ -44,10 +44,18 @@ Packaging uses `pyproject.toml`, the existing `src/cloudeq` layout, and uv.
 The lockfile is `uv.lock`. The environment is the project-local `.venv`, which
 Git ignores. Development dependencies are pytest, Ruff, and mypy only.
 
-FastAPI, CrewAI, PyMongo, confluent-kafka, and a Gemini SDK are compatible
-candidates for later planes. They are not project dependencies in this session.
-Install and re-check the current release when the plane that needs the library
-is implemented.
+Plane 1 installed, from PyPI on 2026-10-31, and locked in `uv.lock`:
+
+- FastAPI 0.162.0
+- Uvicorn 0.54.0
+- httpx 0.28.1
+- Pydantic 2.14.2
+- pydantic-settings 2.16.2
+
+The Gemini router uses the official `models.generateContent` REST method on
+`generativelanguage.googleapis.com` with an injected HTTP client. No Gemini SDK
+is installed. CrewAI, PyMongo, and confluent-kafka remain candidates for later
+planes and are not installed.
 
 ### Runtime and storage
 

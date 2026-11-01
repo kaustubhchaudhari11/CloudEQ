@@ -2,105 +2,87 @@
 
 Product: FORGE SPAN. Team: Cloud EQ. Technical identifiers remain `CloudEQ` / `cloudeq`.
 
-This file is the handoff for the next session. Configuration is ready for review.
-Application behavior is not implemented.
+Plane 1 intake works offline. Planes 2–4 are not implemented. This branch has not been pushed.
 
-## This session
+## Current session
 
 - Date checked: 2026-10-31.
 - Git root: `C:/Users/kaust/projects/CloudEQ`.
-- Branch: `chore/forge-span-configuration`, created from `main` at `6382456`.
-- The Cursor configuration session preserved existing work and made no commit or push. The configuration is now being prepared for a team pull request.
+- Branch: `feature/plane1-intake`, from `main` at `436a8c2`.
+- Configuration remains on `main` through pull request #1.
 - Remote remains `https://github.com/kaustubhchaudhari11/CloudEQ.git`.
-- The repository was not renamed.
-- No infrastructure was started. No Gemini request was sent. `.env` was not created.
+- No Gemini request was sent. Kafka, MongoDB, Docker, and Grafana were not started.
 
-## Completed configuration
+## Plane 1 behavior
 
-| Item | Location |
+- `GET /health` reports the intake plane and `execution_available: false`.
+- `POST /tasks` validates an API prompt, assigns `task_id` and `trace_id`, and returns `rejected`, `routed`, or `handed_off`.
+- `cloudeq-intake submit` prints the same result fields. Exit 2 is validation rejection. Exit 0 is a completed routing decision.
+- The default router is deterministic and offline. A named dataset is infeasible because no catalog exists.
+- The Gemini router calls `models.generateContent` only when mode, live-call flag, API key, and an explicit model ID are all set. Tests inject the HTTP client. Malformed output and timeouts stay `routed` with feasibility `error` and do not hand off.
+- The handoff port records the contract in memory. `execution_started` stays false. A handoff that claims execution or returns mismatched task/trace IDs is not reported as `handed_off`.
+- Telemetry events for one task share `trace_id`. The in-memory sink rejects secret attribute keys, oversized payloads, and conflicting duplicate event ids.
+- GitHub Issues and Jira sources are rejected while their flags are false.
+
+HTTP examples are in `docs/plane1-http.md`. PowerShell commands are in `README.md`.
+
+## Checks actually run for Plane 1
+
+| Check | Result |
 | --- | --- |
-| Requirements, page references, plane ownership, planned checks | `docs/requirements.md` |
-| Four-plane boundaries and shared contracts | `docs/architecture/contracts.md` |
-| Version and design decisions | `docs/architecture/decisions.md` |
-| Architecture baseline and source mapping | `docs/architecture/overview.md` |
-| Packaging, src layout, lint, types, test discovery | `pyproject.toml`, `uv.lock`, `.python-version` |
-| Project-local environment | `.venv` (Git-ignored) |
-| Offline environment names and empty secrets | `.env.example` |
-| PowerShell setup and check commands | `README.md` |
+| `uv run ruff check src tests` | Exit 0 after import formatting. |
+| `uv run ruff format src tests` | Exit 0. |
+| `uv run mypy` | Exit 0. 25 source files. |
+| `uv run pytest` | Exit 0. 27 passed after the handoff identity regression test. One `StarletteDeprecationWarning`: Starlette's `TestClient` still imports `httpx` and asks for `httpx2`. The tests did not use a network. |
 
-Installed and locked development tools, and nothing else:
+Not run:
 
-- pytest 9.2.0
-- ruff 0.17.3
-- mypy 2.4.1
+- A live Gemini request
+- Kafka, MongoDB, Docker, or Grafana
+- Plane 2, 3, or 4 behavior
+- Git push
 
-`cloudeq` 0.1.0 is installed editable from this folder. FastAPI, CrewAI, a Kafka client, PyMongo, and a Gemini SDK are not dependencies yet. Candidate versions that fit Python `>=3.12,<3.14` are recorded in `docs/architecture/decisions.md`.
+Offline demo on 2026-10-31, with live Gemini calls left false:
 
-Python package directories are still markers. No route, agent, container, or normalizer was added.
+- `uv run cloudeq-intake submit --prompt "Add a health check"` exited 0 with `handed_off` and `execution_started` false.
+- A blank prompt exited 2 with `rejected`.
+- `--dataset corpus-v1` exited 0 with `routed`, `infeasible`, and `dataset_check` failed.
+- Uvicorn on `127.0.0.1:8765` returned health `router_mode` offline and a posted task `handed_off` with `execution_started` false. The server was stopped after that check.
 
-## Checks actually run
+## Earlier configuration
 
-| Check | Command | Result |
-| --- | --- | --- |
-| Repository root | `git rev-parse --show-toplevel` | `C:/Users/kaust/projects/CloudEQ` |
-| Interpreter | `py -3.12 --version` | Python 3.12.2 |
-| uv | `uv --version` | uv 0.13.2 |
-| Lock | `uv lock` then `uv lock --check` | Exit 0. 14 packages resolved. |
-| Environment | `uv sync --python 3.12` | Exit 0. `.venv` created. |
-| Package import | `uv run python -c "import ..."` | Exit 0. Printed `imports-ok 0.1.0`. |
-| Lint | `uv run ruff check src tests` | Exit 0. All checks passed. |
-| Format | `uv run ruff format --check src tests` | Exit 0. 13 files already formatted. |
-| Types | `uv run mypy` | Exit 0 after the config correction below. `Success: no issues found in 13 source files.` |
-| Tests | `uv run pytest` | Exit 5. `collected 0 items` and `no tests ran in 0.05s`. |
-
-The first mypy invocation exited 2. mypy 2.4.1 rejects `explicit_package_bases` unless `namespace_packages` is enabled. Those packages have `__init__.py` files, so `explicit_package_bases` was removed. The re-run exited 0.
-
-Exit 5 from pytest means no tests were collected. The placeholder directories do not prove that intake, repair, sandboxing, or observability work.
-
-Not run, because this session forbids them:
-
-- FastAPI server, CLI task submission, and live HTTP calls
-- Gemini or any other paid API
-- Kafka, MongoDB, Docker, and Grafana
-- Host execution of generated code
-- Git commit or push during the Cursor configuration session
+Configuration was merged from `chore/forge-span-configuration`. That session locked pytest 9.2.0, Ruff 0.17.3, and mypy 2.4.1, and left the suite empty. Plane 1 then added FastAPI 0.162.0, Uvicorn 0.54.0, httpx 0.28.1, Pydantic 2.14.2, and pydantic-settings 2.16.2.
 
 ## Roadmap
 
-| Order | Milestone | State | Starts from |
-| --- | --- | --- | --- |
-| 0 | Configuration | Prepared for team review. | This file |
-| 1 | Plane 1 intake: API, CLI, validation, offline feasibility router, handoff contract, correlated telemetry port | Not started | `docs/CURSOR_START_PROMPT.md` |
-| 2 | Plane 2 agent orchestration: six stages, supervisor, bounded Developer–QA loop, DevOps only after pass | Not started | `docs/CURSOR_BUILD_PROMPT.md` milestone 2, after Plane 1 |
-| 3 | Plane 3 sandboxed execution: Docker workspaces, limits, structured results; Git commit stays policy-gated | Not started | Build prompt milestone 3 |
-| 4 | Plane 4 observability: Kafka, raw-before-canonical MongoDB retention, offline and Gemini normalizers, Infinity read API | Not started | Build prompt milestone 4 |
-| 5 | Integration and demonstration: Compose, offline demo, separate live procedure, requirement traceability | Not started | Build prompt milestone 5 |
+| Order | Milestone | State |
+| --- | --- | --- |
+| 0 | Configuration | Merged. |
+| 1 | Plane 1 intake | Offline API, CLI, router, handoff, and telemetry are implemented. Ticket adapters are not. |
+| 2 | Plane 2 agent orchestration | Not started. Continue with `docs/CURSOR_BUILD_PROMPT.md` milestone 2. The handoff port is the boundary. |
+| 3 | Plane 3 sandboxed execution | Not started. |
+| 4 | Plane 4 observability | Not started. Replace the in-memory sink with Kafka and MongoDB dual retention. |
+| 5 | Integration and demonstration | Not started. |
 
-Plane 1 must stay testable without Kafka, MongoDB, Docker, and live Gemini. Ticket intake (GitHub Issues and Jira) remains required and disabled until that adapter is scheduled inside Plane 1 follow-up work. The first Plane 1 session can implement prompt and CLI intake without claiming the ticket adapters are done.
+## Unresolved
 
-## Unresolved decisions
+- Retention durations and deletion
+- Full redaction policy beyond the attribute-key denylist
+- Explicit Gemini model IDs
+- GitHub Issue and Jira payload mapping
+- Canonical field catalog beyond the linkage fields
+- Grafana panel layout
+- No assignment rubric
 
-- Raw and canonical retention durations, TTL, and deletion. Settings stay empty.
-- Full redaction policy. Only the minimum attribute-key denylist is specified.
-- Explicit `GEMINI_ROUTER_MODEL` and `GEMINI_NORMALIZER_MODEL`. No default was guessed.
-- GitHub Issue and Jira payload mapping and credentials.
-- Canonical field catalog beyond links, status, provenance, and missing fields. FOAP Table 4 is evidence, not the frozen schema.
-- Grafana panel layout. The datasource decision is Infinity against a future read API. Grafana is not installed.
-- No assignment rubric.
-
-## Exact next commands
-
-Stay in this folder. Do not start services.
+## Next commands
 
 ```powershell
 Set-Location C:\Users\kaust\projects\CloudEQ
-git rev-parse --show-toplevel
 uv sync
 uv run ruff check src tests
 uv run mypy
 uv run pytest
+uv run cloudeq-intake submit --prompt "Add a health check"
 ```
 
-`uv run pytest` exiting 5 is still expected until Plane 1 adds tests.
-
-Open `FORGE-SPAN.code-workspace`, keep Grok as the coding assistant, and paste the prompt below the divider in `docs/CURSOR_START_PROMPT.md` for the Plane 1 session. Add the proposal extract, the FOAP extract, the architecture image, and `docs/references/FORGE-SPAN-architecture.md` to that chat. Do not attach `.env`.
+Plane 2 should consume `HandoffRequest` through the `TaskHandoff` port, keep the repair loop bounded, and call Plane 3 only through the runtime port. Do not treat the current in-memory acknowledgement as agent execution.

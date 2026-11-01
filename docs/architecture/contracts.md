@@ -1,6 +1,7 @@
 # FORGE SPAN shared contracts and plane boundaries
 
-Configuration specification only. No plane implements these types yet.
+Plane 1 implements submission, feasibility, handoff acknowledgement, and
+telemetry emission. Planes 2–4 still do not implement these types.
 Product name: FORGE SPAN. Team: Cloud EQ. Package and identifiers stay `cloudeq`.
 
 Planes may depend on `src/cloudeq/shared/contracts` and `src/cloudeq/shared/ports`.
@@ -222,7 +223,10 @@ documents. Expiry is a separate decision from keeping both representations.
 
 ## Ports
 
-These are interface obligations. This session does not add Python implementations.
+Plane 1 provides offline implementations of `FeasibilityRouter`, `TaskHandoff`,
+and `TelemetrySink`. The Gemini router is a second `FeasibilityRouter` and stays
+disabled until its configuration gates are all set. The remaining ports are still
+unimplemented.
 
 | Port | Caller | Behavior |
 | --- | --- | --- |
