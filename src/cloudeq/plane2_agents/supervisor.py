@@ -253,7 +253,7 @@ class Supervisor:
             self._emit(
                 handoff,
                 "agents.test_result",
-                {"iteration": iteration, "passed": passed, "feedback": feedback},
+                {"iteration": iteration, "passed": passed, "feedback_present": bool(feedback)},
             )
             if passed:
                 state = RepairState.PASSED
@@ -322,7 +322,7 @@ class Supervisor:
         self._emit(
             handoff,
             "agents.decision",
-            {"stage": stage.value, "summary": summary, "simulation": simulation},
+            {"stage": stage.value, "summary_length": len(summary), "simulation": simulation},
         )
         logger.info(
             "stage completed",
@@ -371,7 +371,7 @@ class Supervisor:
                 "live_crewai": live_crewai,
                 "live_gemini": live_gemini,
                 "execution_kind": execution_kind,
-                "reason": reason,
+                "reason_present": bool(reason),
             },
         )
         return result

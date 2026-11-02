@@ -53,7 +53,7 @@ Not run for Plane 1:
 - `ExecutionRequest` can carry safe relative files with either content or a relative artifact reference, and an allowlisted test plan. The only allowlisted command is `python -m pytest`. Plane 2 does not run it.
 - Telemetry events `agents.stage_completed`, `agents.decision`, `agents.repair_iteration`, `agents.test_result`, and `agents.run_finished` share the handoff trace.
 
-The supervisor rejects mismatched runtime identities, timeouts, host execution reports, and inconsistent pass/exit results. A failed file write stops before tests. A shared runtime error contract lets Plane 3 report failures without importing Plane 2.
+The supervisor rejects mismatched runtime identities, timeouts, host execution reports, and inconsistent pass/exit results. A failed file write stops before tests. A shared runtime error contract lets Plane 3 report failures without importing Plane 2. Stage summaries, raw test output, and error messages are excluded from Plane 2 telemetry events.
 
 ## Checks actually run for Plane 2
 
@@ -61,9 +61,9 @@ The supervisor rejects mismatched runtime identities, timeouts, host execution r
 | --- | --- |
 | `uv lock --check` | Exit 0 on 2026-11-02. |
 | `uv run ruff check src tests` | Exit 0. `All checks passed!` |
-| `uv run ruff format --check src tests` | Exit 0. `48 files already formatted`. |
+| `uv run ruff format --check src tests` | Exit 0. `49 files already formatted`. |
 | `uv run mypy` | Exit 0. `Success: no issues found in 41 source files`. |
-| `uv run pytest -q` | Exit 0. `54 passed in 7.46s`. No network and no CrewAI kickoff. |
+| `uv run pytest -q` | Exit 0. `55 passed`. No network and no CrewAI kickoff. |
 | `uv run cloudeq-agents run --prompt "Add a health check"` | Exit 0. `state` `passed`, `engine` `offline-simulation`, `execution_kind` `simulated`, `simulation` true, `live_crewai` false, `devops_ran` true. |
 | `uv run cloudeq-agents run --engine crewai --prompt "Add a health check"` | Exit 1. `state` `error`, `engine` `crewai-configuration-error`, `live_crewai` false. Live calls stayed disabled. |
 

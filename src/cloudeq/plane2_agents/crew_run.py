@@ -175,7 +175,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             supervisor._emit(
                 handoff,
                 "agents.test_result",
-                {"iteration": iteration, "passed": passed, "feedback": feedback},
+                {"iteration": iteration, "passed": passed, "feedback_present": bool(feedback)},
             )
             if passed:
                 state = RepairState.PASSED

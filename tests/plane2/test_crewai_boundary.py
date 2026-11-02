@@ -384,3 +384,36 @@ def test_runtime_artifact_reference_is_relative_and_unambiguous() -> None:
         RuntimeFile(relative_path="src/health.py", content="x", artifact_ref="artifacts/x")
     accepted = RuntimeFile(relative_path="src/health.py", artifact_ref="artifacts/x")
     assert accepted.artifact_ref == "artifacts/x"
+
+
+def test_untrusted_stage_text_and_test_output_stay_out_of_telemetry() -> None:
+    sentinel = "PRIVATE_SENTINEL"
+    offline_sink = MemoryTelemetrySink()
+    Supervisor(runtime=OfflineRuntimeSimulation(), sink=offline_sink).run(_handoff(sentinel))
+    assert sentinel not in json.dumps(
+        [event.model_dump(mode="json") for event in offline_sink.events]
+    )
+
+    class SensitiveRuntime(MockRuntime):
+        def execute(self, request: ExecutionRequest) -> ExecutionResult:
+            result = super().execute(request)
+            if request.operation is RuntimeOperation.RUN_TESTS:
+                return result.model_copy(update={"stdout": sentinel})
+            return result
+
+    mocked_sink = MemoryTelemetrySink()
+    secret_draft = StageDraft(
+        task_id="task-1",
+        trace_id="trace-1",
+        stage=StageName.REQUIREMENTS,
+        summary=sentinel,
+    )
+    Supervisor(
+        runtime=SensitiveRuntime([True]),
+        sink=mocked_sink,
+        engine="crewai",
+        crew_client=FakeCrew(script=[secret_draft]),
+    ).run(_handoff())
+    assert sentinel not in json.dumps(
+        [event.model_dump(mode="json") for event in mocked_sink.events]
+    )
