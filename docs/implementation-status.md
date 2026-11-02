@@ -2,17 +2,15 @@
 
 Product: FORGE SPAN. Team: Cloud EQ. Technical identifiers remain `CloudEQ` / `cloudeq`.
 
-Plane 1 intake and the Plane 2 offline agent engine work without live services.
-Plane 3 and Plane 4 are not implemented. Plane 2 depends on the Plane 1 branch until its pull request is merged.
+Plane 1 intake and the Plane 2 offline agent engine are on `main`. This branch adds the CrewAI integration boundary. Plane 3 and Plane 4 are not implemented. Live CrewAI mode cannot report an end-to-end success until a container runtime exists.
 
 ## Current session
 
-- Date checked: 2026-11-01.
+- Date checked: 2026-11-02.
 - Git root: `C:/Users/kaust/projects/CloudEQ`.
-- Branch: `feature/plane2-agents`, based on the Plane 1 commit `12f885f`.
-- Configuration remains on `main` through pull request #1. Plane 1 is `12f885f`.
+- Branch: `feature/plane2-crewai`, from `main` at `1bdba3c` (Plane 2 pull request #3). This milestone is reviewed locally and not yet merged.
 - Remote remains `https://github.com/kaustubhchaudhari11/CloudEQ.git`.
-- No Gemini request was sent. CrewAI was not installed or executed. Kafka, MongoDB, Docker, and Grafana were not started. Generated code was not run on the host.
+- No Gemini request was sent. CrewAI 1.15.34 is installed in the project environment; a documented Gemini-model Crew and code-execution-disabled Agent were constructed locally, but kickoff was not called. Kafka, MongoDB, Docker, and Grafana were not started. Generated code was not run on the host.
 
 ## Plane 1 behavior
 
@@ -49,27 +47,34 @@ Not run for Plane 1:
 - DevOps is appended only after state `passed`. Budget exhaustion, cancellation, configuration errors, and runtime failures leave `devops_ran` false.
 - `SupervisingHandoff` implements `TaskHandoff`. It stores the run and returns `execution_started` false. Plane 1's default handoff is still the in-memory acknowledgement and does not start the supervisor.
 - `OfflineRuntimeSimulation` implements `RuntimeExecutor`. Results set `simulation` true and `host_execution` false. `git_commit` is refused. No container starts.
-- `CLOUDEQ_AGENT_ENGINE=crewai` prepares role names and refuses kickoff. `live_crewai` and `live_gemini` stay false. That path is an error, not a simulated success.
+- `CLOUDEQ_AGENT_ENGINE=crewai` does not run a live crew unless `CLOUDEQ_GEMINI_LIVE_CALLS`, `GEMINI_API_KEY`, and an explicit `GEMINI_AGENT_MODEL` are all set. Missing configuration is an error. No model id is guessed.
+- With those gates open, live mode still returns `crewai-execution-unavailable`. `OfflineRuntimeSimulation` cannot count as a test pass, and kickoff is not called. `live_crewai` and `live_gemini` stay false.
+- Injected fake stage clients and a mock runtime are tests only. Their `execution_kind` is `mocked`. Agent text that says the tests passed does not set `passed`. DevOps still waits for a runtime result with `simulation` false, a matching identity, and `passed` true.
+- `ExecutionRequest` can carry safe relative files with either content or a relative artifact reference, and an allowlisted test plan. The only allowlisted command is `python -m pytest`. Plane 2 does not run it.
 - Telemetry events `agents.stage_completed`, `agents.decision`, `agents.repair_iteration`, `agents.test_result`, and `agents.run_finished` share the handoff trace.
 
-The supervisor rejects mismatched runtime identities, timeouts, host execution reports, and inconsistent pass/exit results. A failed file write stops before tests.
+The supervisor rejects mismatched runtime identities, timeouts, host execution reports, and inconsistent pass/exit results. A failed file write stops before tests. A shared runtime error contract lets Plane 3 report failures without importing Plane 2. Stage summaries, raw test output, and error messages are excluded from Plane 2 telemetry events.
 
 ## Checks actually run for Plane 2
 
 | Check | Result |
 | --- | --- |
-| `uv run ruff check src tests` | Exit 0. |
-| `uv run ruff format --check src tests` | Exit 0. |
-| `uv run mypy` | Exit 0. 36 source files. |
-| `uv run pytest -q` | Exit 0. 41 passed, including the Plane 1 suite and runtime-result boundary regressions. One `StarletteDeprecationWarning` from Starlette's `TestClient` importing `httpx`. No network. |
-| `uv run cloudeq-agents run --prompt "Add a health check"` | Exit 0. `state` `passed`, `engine` `offline-simulation`, `simulation` true, `live_crewai` false, `live_gemini` false, `host_execution` false, `devops_ran` true, one iteration. |
+| `uv lock --check` | Exit 0 on 2026-11-02. |
+| `uv run ruff check src tests` | Exit 0. `All checks passed!` |
+| `uv run ruff format --check src tests` | Exit 0. `49 files already formatted`. |
+| `uv run mypy` | Exit 0. `Success: no issues found in 41 source files`. |
+| `uv run pytest -q` | Exit 0. `55 passed`. No network and no CrewAI kickoff. |
+| `uv run cloudeq-agents run --prompt "Add a health check"` | Exit 0. `state` `passed`, `engine` `offline-simulation`, `execution_kind` `simulated`, `simulation` true, `live_crewai` false, `devops_ran` true. |
+| `uv run cloudeq-agents run --engine crewai --prompt "Add a health check"` | Exit 1. `state` `error`, `engine` `crewai-configuration-error`, `live_crewai` false. Live calls stayed disabled. |
 
 Not run:
 
-- Live CrewAI kickoff
+- Live CrewAI `kickoff`
 - A live Gemini request
 - Docker, Kafka, MongoDB, or Grafana
 - Host execution of generated code
+
+The offline `cloudeq-agents` demonstration remains a simulation. `cloudeq-agents run --engine crewai` is a configuration or availability error with the default settings. It is not a live run.
 
 The same Plane 2 demonstration command is in `README.md`.
 
@@ -82,7 +87,7 @@ Plane 1 offline demo on 2026-10-31, with live Gemini calls left false:
 
 ## Earlier configuration
 
-Configuration was merged from `chore/forge-span-configuration`. That session locked pytest 9.2.0, Ruff 0.17.3, and mypy 2.4.1, and left the suite empty. Plane 1 then added FastAPI 0.162.0, Uvicorn 0.54.0, httpx 0.28.1, Pydantic 2.14.2, and pydantic-settings 2.16.2. Plane 2 added PyYAML 6.0.3 and types-PyYAML 6.0.12.20261030. CrewAI is not installed.
+Configuration was merged from `chore/forge-span-configuration`. That session locked pytest 9.2.0, Ruff 0.17.3, and mypy 2.4.1, and left the suite empty. Plane 1 then added FastAPI 0.162.0, Uvicorn 0.54.0, httpx 0.28.1, Pydantic 2.14.2, and pydantic-settings 2.16.2. Plane 2 added PyYAML 6.0.3 and types-PyYAML 6.0.12.20261030. This branch adds CrewAI 1.15.34 with the `google-genai` extra, which locked `google-genai` 1.65.0. Both are project-local.
 
 ## Roadmap
 
@@ -90,8 +95,8 @@ Configuration was merged from `chore/forge-span-configuration`. That session loc
 | --- | --- | --- |
 | 0 | Configuration | Merged. |
 | 1 | Plane 1 intake | Offline API, CLI, router, handoff, and telemetry are implemented. Ticket adapters are not. |
-| 2 | Plane 2 agent orchestration | Offline supervisor, repair loop, telemetry, and `SupervisingHandoff` are implemented. Live CrewAI is refused. |
-| 3 | Plane 3 sandboxed execution | Not started. Implement Docker behind `RuntimeExecutor` and replace `OfflineRuntimeSimulation`. |
+| 2 | Plane 2 agent orchestration | Offline simulation remains the default. The CrewAI adapter can build a Gemini stage crew, and tests inject fakes. Live kickoff is blocked until Plane 3. |
+| 3 | Plane 3 sandboxed execution | Not started. Implement Docker behind `RuntimeExecutor` with `execution_backend="container"`. |
 | 4 | Plane 4 observability | Not started. Replace the in-memory sink with Kafka and MongoDB dual retention. |
 | 5 | Integration and demonstration | Not started. |
 
@@ -117,4 +122,4 @@ uv run cloudeq-intake submit --prompt "Add a health check"
 uv run cloudeq-agents run --prompt "Add a health check"
 ```
 
-Before Plane 3 integration, define real work artifacts and test commands in the shared runtime request; the current request contains only identifiers, an operation, and iteration. Also revise the supervisor's simulation-only result checks when a real adapter is wired. Plane 3 should then implement `RuntimeExecutor` with Docker: path checks, resource limits, no host secrets, no Docker socket, and no host execution of generated code. Keep `ExecutionRequest` and `ExecutionResult`. Leave `execution_started` false on the Plane 1 acknowledgement until a real sandbox run is the thing being reported. If Docker is absent, adapter tests still run and the live container check stays unverified.
+Plane 3 should implement `RuntimeExecutor` with `execution_backend` set to `container`. It should write `ExecutionRequest.files` only under the task workspace, reject paths that fail `normalize_relative_path`, and run `ExecutionRequest.test_plan` commands only when each command is in `TEST_COMMAND_ALLOWLIST`. Results must set `simulation` false and `host_execution` false. Keep resource limits, no host secrets, and no Docker socket. Leave `execution_started` false on the Plane 1 acknowledgement until that container run is the thing being reported. A live CrewAI kickoff must stay unwired until that executor exists. If Docker is absent, adapter tests still run and the live container check stays unverified.

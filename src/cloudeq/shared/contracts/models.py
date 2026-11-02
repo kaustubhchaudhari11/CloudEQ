@@ -4,11 +4,12 @@ These models are the intake, feasibility, handoff, and telemetry shapes from
 ``docs/architecture/contracts.md``. They do not depend on FastAPI or a model SDK.
 """
 
+import re
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SubmissionSource(StrEnum):
@@ -145,6 +146,70 @@ class RuntimeOperation(StrEnum):
     GIT_COMMIT = "git_commit"
 
 
+TEST_COMMAND_ALLOWLIST: tuple[str, ...] = ("python -m pytest",)
+MAX_RUNTIME_FILES = 20
+MAX_RUNTIME_FILE_CHARS = 100_000
+_ARTIFACT_REF = re.compile(r"[A-Za-z0-9_./-]{1,256}")
+
+
+def normalize_relative_path(value: str) -> str:
+    """Accept a workspace-relative POSIX path and reject escapes."""
+
+    if not isinstance(value, str) or value == "" or "\\" in value or "\x00" in value:
+        raise ValueError("Runtime paths must be non-empty relative POSIX paths.")
+    if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        raise ValueError("Runtime paths must stay inside the task workspace.")
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("Runtime paths cannot contain empty, current, or parent segments.")
+    return "/".join(parts)
+
+
+class RuntimeFile(BaseModel):
+    """A file the future container runtime may write. Plane 2 does not write it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    relative_path: str
+    content: str | None = None
+    artifact_ref: str | None = None
+
+    @model_validator(mode="after")
+    def _safe_file(self) -> "RuntimeFile":
+        self.relative_path = normalize_relative_path(self.relative_path)
+        has_content = self.content is not None
+        reference = (self.artifact_ref or "").strip()
+        if has_content == bool(reference):
+            raise ValueError(
+                "A runtime file needs exactly one of content or an artifact reference."
+            )
+        if self.content is not None and len(self.content) > MAX_RUNTIME_FILE_CHARS:
+            raise ValueError("Runtime file content exceeds the contract limit.")
+        if reference:
+            if _ARTIFACT_REF.fullmatch(reference) is None:
+                raise ValueError("Artifact references must be safe relative references.")
+            normalize_relative_path(reference)
+            self.artifact_ref = reference
+        return self
+
+
+class TestPlan(BaseModel):
+    """Commands a future container may run. The allowlist is exact, not a shell."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    commands: list[str]
+
+    @model_validator(mode="after")
+    def _allowlisted(self) -> "TestPlan":
+        if not self.commands or len(self.commands) > 5:
+            raise ValueError("A test plan needs one to five allowlisted commands.")
+        for command in self.commands:
+            if command not in TEST_COMMAND_ALLOWLIST:
+                raise ValueError(f"Command is not allowlisted: {command}")
+        return self
+
+
 class ExecutionRequest(BaseModel):
     """One sandbox operation. Plane 2 sends it; Plane 3 will execute it."""
 
@@ -154,6 +219,14 @@ class ExecutionRequest(BaseModel):
     trace_id: str
     operation: RuntimeOperation
     iteration: int | None = None
+    files: list[RuntimeFile] = Field(default_factory=list)
+    test_plan: TestPlan | None = None
+
+    @model_validator(mode="after")
+    def _file_count(self) -> "ExecutionRequest":
+        if len(self.files) > MAX_RUNTIME_FILES:
+            raise ValueError("An execution request has too many files.")
+        return self
 
 
 class ExecutionResult(BaseModel):

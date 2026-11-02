@@ -7,16 +7,13 @@ does not run generated code, and does not invoke Git on the host.
 from collections.abc import Callable
 
 from cloudeq.shared.contracts.models import ExecutionRequest, ExecutionResult, RuntimeOperation
-
-
-class RuntimeExecutionError(Exception):
-    def __init__(self, reason: str) -> None:
-        super().__init__(reason)
-        self.reason = reason
+from cloudeq.shared.ports.errors import RuntimeExecutionError
 
 
 class OfflineRuntimeSimulation:
     """Scripted Plane 3 double. `simulation` is always true."""
+
+    execution_backend = "simulation"
 
     def __init__(
         self,

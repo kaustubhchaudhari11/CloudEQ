@@ -1,6 +1,7 @@
 """Shared request and event contracts."""
 
 from cloudeq.shared.contracts.models import (
+    TEST_COMMAND_ALLOWLIST,
     DatasetCheck,
     EnvelopeRejected,
     ExecutionRequest,
@@ -12,12 +13,14 @@ from cloudeq.shared.contracts.models import (
     PlaneName,
     RouterKind,
     RoutingRequest,
+    RuntimeFile,
     RuntimeOperation,
     SubmissionSource,
     TaskResult,
     TaskStatus,
     TaskSubmission,
     TelemetryEnvelope,
+    TestPlan,
 )
 
 __all__ = [
@@ -32,10 +35,13 @@ __all__ = [
     "PlaneName",
     "RouterKind",
     "RoutingRequest",
+    "RuntimeFile",
     "RuntimeOperation",
+    "TEST_COMMAND_ALLOWLIST",
     "SubmissionSource",
     "TaskResult",
     "TaskStatus",
     "TaskSubmission",
     "TelemetryEnvelope",
+    "TestPlan",
 ]

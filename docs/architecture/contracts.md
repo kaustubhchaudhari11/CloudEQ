@@ -125,12 +125,27 @@ Repair loop states: `running`, `passed`, `failed_budget_exhausted`, `cancelled`,
 - Exhausting the budget is a completed failure result, not a crash that drops telemetry.
 
 Plane 2 calls Plane 3 only through the runtime port. The current adapter,
-`OfflineRuntimeSimulation`, sets `simulation` true and does not start a container.
-A result with `host_execution` true is an error, and DevOps does not run.
+`OfflineRuntimeSimulation`, sets `simulation` true and `execution_backend` to
+`simulation`. It does not start a container. A result with `host_execution` true
+is an error, and DevOps does not run.
+
+Live CrewAI mode requires `CLOUDEQ_GEMINI_LIVE_CALLS=true`, a non-empty
+`GEMINI_API_KEY`, and an explicit `GEMINI_AGENT_MODEL`. It still cannot return
+`passed` while the runtime backend is `simulation` or `mock` labeled as live.
+A mocked test client is not a live Gemini call. Agent text is not a test pass.
+Only `ExecutionResult.passed` from a non-simulated runtime result can pass,
+and that result must match the handoff task and trace ids.
 
 ## Runtime execution
 
 Operations: `write_file`, `run_tests`, `git_commit`.
+
+`ExecutionRequest.files` carries workspace files. Each path is a relative POSIX
+path with no parent segment. Each file has exactly one of content or a safe
+relative artifact reference. `ExecutionRequest.test_plan.commands` must be copied from
+`TEST_COMMAND_ALLOWLIST`. The only entry is `python -m pytest`. Plane 2 does
+not execute the command or write the files. Runtime adapters raise the shared
+`RuntimeExecutionError` when no trustworthy `ExecutionResult` can be returned.
 
 There is no `git_push` operation. `CLOUDEQ_RUNTIME_ALLOW_GIT_PUSH` stays false.
 `git_commit` is rejected unless `CLOUDEQ_RUNTIME_ALLOW_GIT_COMMIT=true`, and even
