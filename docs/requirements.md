@@ -100,7 +100,7 @@ Plane 1 and Plane 2 checks that have run are in the traceability section. Plane 
 | R2, R3 | API and CLI accept a non-empty prompt and reject a blank one. Tests cover both. |
 | R4 | GitHub Issues and Jira stay disabled. Tests reject those sources. The adapters are not implemented. |
 | R5, R6 | Offline routing is the default. Infeasible dataset checks and Gemini errors do not hand off. Tests use an injected client and do not call Gemini. |
-| R7 | The offline supervisor records Requirements, Planning, Architecture, Development, Testing, and DevOps in that order after a passing test. Live CrewAI was not executed. The CrewAI adapter refuses kickoff. |
+| R7 | The offline supervisor records the six stages in order after a simulated pass. The CrewAI adapter can build one Gemini stage crew. Automated tests inject a fake client. Live kickoff was not run, and live mode reports execution unavailable. |
 | R8 | `agents.yaml` version 1 is loaded before stages. A missing or incomplete file returns `error` and makes no runtime call. |
 | R9 | Tests cover a first-attempt pass, fail-then-pass, budget exhaustion, and cancellation. DevOps is recorded only after `passed`. |
 | R10 | The default maximum is 3. A maximum below 1 returns `error` before stages. A budget of 3 records three failing iterations and stops. |

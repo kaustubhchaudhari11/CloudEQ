@@ -57,6 +57,7 @@ class StageOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     stage: StageName
+    task_id: str
     trace_id: str
     summary: str
     simulation: bool
@@ -88,3 +89,4 @@ class AgentRunResult(BaseModel):
     host_execution: bool
     termination_reason: str
     engine: str
+    execution_kind: str = "simulated"

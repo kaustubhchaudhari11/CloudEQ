@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from cloudeq.plane2_agents.agents.crewai import CrewAIAdapter, CrewAINotExecuted
 from cloudeq.plane2_agents.agents.offline import OfflineStageWorker
+from cloudeq.plane2_agents.agents.stage_client import CrewStageClient
 from cloudeq.plane2_agents.config_loader import (
     DEFAULT_AGENTS_CONFIG,
     AgentConfigError,
@@ -20,15 +20,16 @@ from cloudeq.plane2_agents.models import (
     StageName,
     StageOutput,
 )
-from cloudeq.plane2_agents.runtime_sim import RuntimeExecutionError
+from cloudeq.plane2_agents.runtime_checks import runtime_problem
+from cloudeq.plane2_agents.settings import AgentSettings
 from cloudeq.shared.contracts.models import (
     ExecutionRequest,
-    ExecutionResult,
     HandoffRequest,
     PlaneName,
     RuntimeOperation,
     TelemetryEnvelope,
 )
+from cloudeq.shared.ports.errors import RuntimeExecutionError
 from cloudeq.shared.ports.protocols import RuntimeExecutor, TelemetrySink
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,8 @@ class Supervisor:
         engine: str = "offline",
         token: CancelToken | None = None,
         worker: OfflineStageWorker | None = None,
-        crewai: CrewAIAdapter | None = None,
+        settings: AgentSettings | None = None,
+        crew_client: CrewStageClient | None = None,
     ) -> None:
         self._config_path = config_path or DEFAULT_AGENTS_CONFIG
         self._runtime = runtime
@@ -62,11 +64,28 @@ class Supervisor:
         self._engine = engine
         self._token = token or CancelToken()
         self._worker = worker or OfflineStageWorker()
-        self._crewai = crewai or CrewAIAdapter()
+        self._settings = settings
+        self._crew_client = crew_client
 
     @property
     def token(self) -> CancelToken:
         return self._token
+
+    @property
+    def settings(self) -> AgentSettings:
+        return self._settings or AgentSettings()
+
+    @property
+    def crew_client(self) -> CrewStageClient | None:
+        return self._crew_client
+
+    @property
+    def runtime(self) -> RuntimeExecutor:
+        return self._runtime
+
+    @property
+    def max_iterations(self) -> int:
+        return self._max_iterations
 
     def run(self, handoff: HandoffRequest) -> AgentRunResult:
         if self._max_iterations < 1:
@@ -94,19 +113,9 @@ class Supervisor:
                 engine=self._engine_label(),
             )
         if self._engine == "crewai":
-            try:
-                self._crewai.execute(team)
-            except CrewAINotExecuted as exc:
-                return self._finish(
-                    handoff,
-                    state=RepairState.ERROR,
-                    stages=[],
-                    iterations=[],
-                    devops_ran=False,
-                    reason=exc.reason,
-                    simulation=False,
-                    engine="crewai-not-executed",
-                )
+            from cloudeq.plane2_agents.crew_run import run_crew
+
+            return run_crew(self, handoff, team)
         if self._token.cancelled:
             return self._finish(
                 handoff,
@@ -153,21 +162,14 @@ class Supervisor:
                         iteration=iteration,
                     )
                 )
-                if written.host_execution:
-                    raise RuntimeExecutionError(
-                        "Runtime reported host execution. Generated code must stay off the host."
-                    )
-                if (
-                    written.task_id != handoff.task_id
-                    or written.trace_id != handoff.trace_id
-                    or written.operation is not RuntimeOperation.WRITE_FILE
-                    or written.host_execution
-                    or written.timed_out
-                    or written.exit_code != 0
-                    or written.passed is not None
-                    or not written.simulation
-                ):
-                    raise RuntimeExecutionError("Runtime returned an unusable developer result.")
+                problem = runtime_problem(
+                    written,
+                    handoff=handoff,
+                    operation=RuntimeOperation.WRITE_FILE,
+                    expect_simulation=True,
+                )
+                if problem is not None:
+                    raise RuntimeExecutionError(problem)
                 tested = self._runtime.execute(
                     ExecutionRequest(
                         task_id=handoff.task_id,
@@ -187,33 +189,31 @@ class Supervisor:
                     simulation=True,
                     engine="offline-simulation",
                 )
-            host_result = self._reject_host_execution(handoff, stages, iterations, written, tested)
-            if host_result is not None:
-                return host_result
-            if (
-                written.task_id != handoff.task_id
-                or tested.task_id != handoff.task_id
-                or written.trace_id != handoff.trace_id
-                or tested.trace_id != handoff.trace_id
-                or written.operation is not RuntimeOperation.WRITE_FILE
-                or tested.operation is not RuntimeOperation.RUN_TESTS
-                or written.timed_out
-                or tested.timed_out
-                or written.exit_code != 0
-                or written.passed is not None
-                or tested.passed is None
-                or (tested.passed is True and tested.exit_code != 0)
-                or (tested.passed is False and tested.exit_code == 0)
-                or not written.simulation
-                or not tested.simulation
-            ):
+            problem = runtime_problem(
+                tested,
+                handoff=handoff,
+                operation=RuntimeOperation.RUN_TESTS,
+                expect_simulation=True,
+            )
+            if problem is not None:
                 return self._finish(
                     handoff,
                     state=RepairState.ERROR,
                     stages=stages,
                     iterations=iterations,
                     devops_ran=False,
-                    reason="Runtime returned an unusable or mismatched developer or tester result.",
+                    reason=problem,
+                    simulation=True,
+                    engine="offline-simulation",
+                )
+            if not isinstance(tested.passed, bool):
+                return self._finish(
+                    handoff,
+                    state=RepairState.ERROR,
+                    stages=stages,
+                    iterations=iterations,
+                    devops_ran=False,
+                    reason="Runtime did not return a test pass or fail.",
                     simulation=True,
                     engine="offline-simulation",
                 )
@@ -299,12 +299,20 @@ class Supervisor:
             engine="offline-simulation",
         )
 
-    def _record_stage(self, handoff: HandoffRequest, stage: StageName, summary: str) -> StageOutput:
+    def _record_stage(
+        self,
+        handoff: HandoffRequest,
+        stage: StageName,
+        summary: str,
+        *,
+        simulation: bool = True,
+    ) -> StageOutput:
         output = StageOutput(
             stage=stage,
+            task_id=handoff.task_id,
             trace_id=handoff.trace_id,
             summary=summary,
-            simulation=True,
+            simulation=simulation,
         )
         self._emit(
             handoff,
@@ -314,34 +322,13 @@ class Supervisor:
         self._emit(
             handoff,
             "agents.decision",
-            {"stage": stage.value, "summary": summary, "simulation": True},
+            {"stage": stage.value, "summary": summary, "simulation": simulation},
         )
         logger.info(
             "stage completed",
             extra={"trace_id": handoff.trace_id, "task_id": handoff.task_id, "status": stage.value},
         )
         return output
-
-    def _reject_host_execution(
-        self,
-        handoff: HandoffRequest,
-        stages: list[StageOutput],
-        iterations: list[RepairIteration],
-        written: ExecutionResult,
-        tested: ExecutionResult,
-    ) -> AgentRunResult | None:
-        if written.host_execution or tested.host_execution:
-            return self._finish(
-                handoff,
-                state=RepairState.ERROR,
-                stages=stages,
-                iterations=iterations,
-                devops_ran=False,
-                reason="Runtime reported host execution. Generated code must stay off the host.",
-                simulation=True,
-                engine="offline-simulation",
-            )
-        return None
 
     def _finish(
         self,
@@ -354,6 +341,9 @@ class Supervisor:
         reason: str,
         simulation: bool,
         engine: str,
+        execution_kind: str = "simulated",
+        live_crewai: bool = False,
+        live_gemini: bool = False,
     ) -> AgentRunResult:
         result = AgentRunResult(
             task_id=handoff.task_id,
@@ -363,11 +353,12 @@ class Supervisor:
             iterations=iterations,
             devops_ran=devops_ran,
             simulation=simulation,
-            live_crewai=False,
-            live_gemini=False,
+            live_crewai=live_crewai,
+            live_gemini=live_gemini,
             host_execution=False,
             termination_reason=reason,
             engine=engine,
+            execution_kind=execution_kind,
         )
         self._emit(
             handoff,
@@ -377,7 +368,9 @@ class Supervisor:
                 "devops_ran": devops_ran,
                 "iterations": len(iterations),
                 "simulation": simulation,
-                "live_crewai": False,
+                "live_crewai": live_crewai,
+                "live_gemini": live_gemini,
+                "execution_kind": execution_kind,
                 "reason": reason,
             },
         )

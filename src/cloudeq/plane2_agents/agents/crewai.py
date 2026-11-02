@@ -1,32 +1,63 @@
-"""CrewAI boundary. This module does not import CrewAI and does not call it.
+"""Injectable CrewAI boundary for one SDLC stage.
 
-The default engine is the offline simulation. Selecting this adapter records
-that a live crew was not started.
+Live kickoff is implemented and stays behind explicit Gemini configuration.
+This module does not execute generated code, and the supervisor does not treat
+a live kickoff as an end-to-end success while Plane 3 is absent.
 """
 
-from cloudeq.plane2_agents.models import AgentTeam
+from collections.abc import Callable
+
+from cloudeq.plane2_agents.agents.stage_client import (
+    CrewConfigurationError,
+    CrewProviderError,
+    CrewStageTimeout,
+    MalformedStageOutput,
+    StageDraft,
+    StageRunRequest,
+    parse_stage_text,
+    require_live_gemini,
+)
+from cloudeq.plane2_agents.settings import AgentSettings
 
 
-class CrewAINotExecuted(Exception):
-    def __init__(self, reason: str) -> None:
-        super().__init__(reason)
-        self.reason = reason
+class CrewAIGeminiStageClient:
+    """Call one configured role. An injected kickoff never counts as live."""
 
+    def __init__(
+        self,
+        settings: AgentSettings,
+        *,
+        kickoff: Callable[[StageRunRequest], str] | None = None,
+    ) -> None:
+        self._settings = settings
+        self._kickoff = kickoff
+        self.uses_live_provider = kickoff is None
+        self.live_crewai = False
+        self.live_gemini = False
 
-class CrewAIAdapter:
-    """Prepares role names from agents.yaml and refuses to call kickoff."""
+    def run_stage(self, request: StageRunRequest) -> StageDraft:
+        require_live_gemini(self._settings)
+        raw = self._raw_output(request)
+        return parse_stage_text(raw, request)
 
-    live_crewai = False
-    live_gemini = False
+    def _raw_output(self, request: StageRunRequest) -> str:
+        if self._kickoff is not None:
+            try:
+                return self._kickoff(request)
+            except TimeoutError as exc:
+                raise CrewStageTimeout("The injected stage call timed out.") from exc
+            except (
+                MalformedStageOutput,
+                CrewStageTimeout,
+                CrewProviderError,
+                CrewConfigurationError,
+            ):
+                raise
+            except Exception as exc:
+                raise CrewProviderError("The stage provider failed.") from exc
+        from cloudeq.plane2_agents.agents.crewai_live import live_kickoff
 
-    def prepare_roles(self, team: AgentTeam) -> list[str]:
-        return [role.name.value for role in team.roles]
-
-    def execute(self, team: AgentTeam) -> None:
-        prepared = ", ".join(self.prepare_roles(team))
-        raise CrewAINotExecuted(
-            "Live CrewAI kickoff was not run. "
-            f"Prepared roles: {prepared}. "
-            "Install CrewAI and an explicit model in a later session before claiming "
-            "a live crew. This result is not an offline simulation of success."
-        )
+        raw = live_kickoff(self._settings, request)
+        self.live_crewai = True
+        self.live_gemini = True
+        return raw

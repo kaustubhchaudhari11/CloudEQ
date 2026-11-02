@@ -58,11 +58,18 @@ is installed. PyMongo and confluent-kafka remain candidates for Plane 4 and are
 not installed.
 
 Plane 2 installed PyYAML 6.0.3 and the dev stub package types-PyYAML
-6.0.12.20261030 so `agents.yaml` can be parsed and type-checked. CrewAI 1.15.33
-stays compatible with this Python window and is not installed. The default
-engine is `offline`: a labeled simulation. `CLOUDEQ_AGENT_ENGINE=crewai`
-prepares the six role names and raises before kickoff. That refusal is not a
-successful crew and is not evidence that CrewAI or Gemini ran.
+6.0.12.20261030 so `agents.yaml` can be parsed and type-checked. The default
+engine is `offline`: a labeled simulation.
+
+On 2026-11-02, CrewAI 1.15.34 was installed with the `google-genai` extra.
+That lock resolved `google-genai` 1.65.0. CrewAI's own constraint is
+`>=3.10,<3.14`, which matches this project. The native Gemini call is
+`LLM(model="gemini/<GEMINI_AGENT_MODEL>", api_key=..., timeout=...)`.
+The model id stays empty until someone sets it. Official docs:
+[CrewAI 1.15.34](https://pypi.org/project/crewai/1.15.34/) and
+[CrewAI LLMs](https://docs.crewai.com/v1.15.34/en/concepts/llms).
+Installing the package does not prove a live kickoff. Live mode returns
+execution unavailable until Plane 3 provides a container executor.
 
 ### Runtime and storage
 

@@ -193,9 +193,11 @@ def test_crewai_engine_does_not_pretend_to_run() -> None:
     result = supervisor.run(_handoff())
     assert result.state is RepairState.ERROR
     assert result.live_crewai is False
+    assert result.live_gemini is False
     assert result.simulation is False
-    assert result.engine == "crewai-not-executed"
-    assert "Live CrewAI kickoff was not run" in result.termination_reason
+    assert result.execution_kind == "configuration-error"
+    assert result.engine == "crewai-configuration-error"
+    assert "live calls" in result.termination_reason.lower()
     assert result.devops_ran is False
     assert runtime.calls == []
 

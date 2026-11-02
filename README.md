@@ -112,8 +112,9 @@ uv run pytest
 ```
 
 `uv sync` creates `.venv` in this folder and installs the package, FastAPI,
-Uvicorn, httpx, PyYAML, pytest, Ruff, and mypy. It does not install CrewAI, a
-Kafka client, MongoDB, Docker, or Grafana, and it does not call Gemini.
+Uvicorn, httpx, PyYAML, CrewAI 1.15.34 with the Gemini extra, pytest, Ruff,
+and mypy. It does not install a Kafka client, MongoDB, Docker, or Grafana,
+and it does not call Gemini.
 
 Expected results on this machine:
 
@@ -176,8 +177,10 @@ $env:CLOUDEQ_REPAIR_MAX_ITERATIONS = "3"
 uv run cloudeq-agents run --prompt "Add a health check"
 ```
 
-Exit 0 is `passed`. Exit 2 is `failed_budget_exhausted`. Exit 3 is `cancelled`.
-Exit 1 is `error`, including a CrewAI engine request that refuses kickoff.
+Exit 0 is `passed` for the offline simulation. Exit 2 is `failed_budget_exhausted`.
+Exit 3 is `cancelled`. Exit 1 is `error`. `--engine crewai` with the default
+settings is a configuration error. With a key and model id set, it still reports
+that container execution is unavailable and does not call Gemini.
 
 ## Roadmap
 
@@ -185,7 +188,7 @@ Status is in `docs/implementation-status.md`.
 
 1. Configuration — done.
 2. Plane 1, intake — offline API and CLI are implemented. Ticket adapters are not.
-3. Plane 2, agent orchestration — offline supervisor, repair loop, and handoff port are implemented. Live CrewAI is not.
+3. Plane 2, agent orchestration — offline simulation is the default. The CrewAI adapter is installed and tested with fakes. Live kickoff waits for Plane 3.
 4. Plane 3, sandboxed execution — next. Replace `OfflineRuntimeSimulation` with the Docker `RuntimeExecutor`.
 5. Plane 4, observability.
 6. Integration and demonstration.
