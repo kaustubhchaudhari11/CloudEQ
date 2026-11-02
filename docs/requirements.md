@@ -49,7 +49,7 @@ FOAP's seven layers are Source systems, Source data, Streaming, Event-driven, Pr
 
 ## Requirements
 
-Acceptance checks for Planes 2–4 are planned. Plane 1 checks that have run are in the traceability section.
+Plane 1 and Plane 2 checks that have run are in the traceability section. Plane 3 and Plane 4 checks are still planned.
 
 | ID | Requirement | Source | Plane | Planned acceptance check |
 | --- | --- | --- | --- | --- |
@@ -95,13 +95,18 @@ Acceptance checks for Planes 2–4 are planned. Plane 1 checks that have run are
 
 ## Traceability status
 
-| ID | Plane 1 state |
+| ID | State |
 | --- | --- |
 | R2, R3 | API and CLI accept a non-empty prompt and reject a blank one. Tests cover both. |
 | R4 | GitHub Issues and Jira stay disabled. Tests reject those sources. The adapters are not implemented. |
 | R5, R6 | Offline routing is the default. Infeasible dataset checks and Gemini errors do not hand off. Tests use an injected client and do not call Gemini. |
-| R27 | Accepted, routed, and handed-off events share one `trace_id` and `task_id`. |
-| R28 | A source scan fails if Plane 1 imports Plane 2, 3, or 4. |
-| R29 | `uv run pytest` uses the offline router and in-memory ports. |
+| R7 | The offline supervisor records Requirements, Planning, Architecture, Development, Testing, and DevOps in that order after a passing test. Live CrewAI was not executed. The CrewAI adapter refuses kickoff. |
+| R8 | `agents.yaml` version 1 is loaded before stages. A missing or incomplete file returns `error` and makes no runtime call. |
+| R9 | Tests cover a first-attempt pass, fail-then-pass, budget exhaustion, and cancellation. DevOps is recorded only after `passed`. |
+| R10 | The default maximum is 3. A maximum below 1 returns `error` before stages. A budget of 3 records three failing iterations and stops. |
+| R11 | The supervisor rejects a runtime result that reports host execution. Generated code was not run on the host. Gemini did not write code in this session. Docker isolation belongs to Plane 3. |
+| R27 | Intake and agent events for one task share `trace_id` and `task_id`, including repair iterations. |
+| R28 | Source scans fail if Plane 1 or Plane 2 imports another plane's package. |
+| R29 | `uv run pytest` uses the offline router, the in-memory handoff, and the labeled runtime simulation. |
 | R30 | The intake sink rejects denied attribute keys and oversized payloads. Plane 4 raw retention is not implemented. |
-| R1, R7–R26 | Unchanged. They belong to later planes or to documentation already recorded. |
+| R1, R12–R26 | Unchanged. They belong to later planes or to documentation already recorded. |

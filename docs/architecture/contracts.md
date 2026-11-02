@@ -1,7 +1,8 @@
 # FORGE SPAN shared contracts and plane boundaries
 
 Plane 1 implements submission, feasibility, handoff acknowledgement, and
-telemetry emission. Planes 2–4 still do not implement these types.
+telemetry emission. Plane 2 implements an offline supervisor and the shared
+runtime request/response contract. Planes 3–4 remain unimplemented.
 Product name: FORGE SPAN. Team: Cloud EQ. Package and identifiers stay `cloudeq`.
 
 Planes may depend on `src/cloudeq/shared/contracts` and `src/cloudeq/shared/ports`.
@@ -98,9 +99,16 @@ Only `status=feasible` may be handed to Plane 2.
 ## Agent handoff and repair loop
 
 Handoff payload: `task_id`, `trace_id`, accepted prompt, feasibility summary,
-`canonical_schema_version` not included. The supervisor later reads agent
-configuration. The diagram's `agents.yaml` is the intended configuration file;
-its schema is a Plane 2 implementation item, not a file in this session.
+`canonical_schema_version` not included. The supervisor reads
+`src/cloudeq/plane2_agents/config/agents.yaml` unless `CLOUDEQ_AGENTS_CONFIG`
+points at another file.
+
+`agents.yaml` version is `1`. `roles` must be exactly these proposal names, in
+this order, each with a non-empty `goal` and `diagram_label`: Requirements,
+Planning, Architecture, Development, Testing, DevOps. Diagram labels in the
+packaged file are Requirements, Planner, Architect, Developer, QA tester, and
+DevOps. A missing file, unknown role, empty goal, or different order fails
+before any stage or runtime call.
 
 Stage names in the proposal are Requirements, Planning, Architecture, Development,
 Testing, and DevOps. Diagram labels are Requirements, Planner, Architect,
@@ -116,7 +124,9 @@ Repair loop states: `running`, `passed`, `failed_budget_exhausted`, `cancelled`,
 - Each iteration records its number, termination reason, and related `trace_id`.
 - Exhausting the budget is a completed failure result, not a crash that drops telemetry.
 
-Plane 2 calls Plane 3 only through the runtime port.
+Plane 2 calls Plane 3 only through the runtime port. The current adapter,
+`OfflineRuntimeSimulation`, sets `simulation` true and does not start a container.
+A result with `host_execution` true is an error, and DevOps does not run.
 
 ## Runtime execution
 
@@ -139,7 +149,8 @@ Execution policy for the Docker backend:
   decision changes the environment defaults.
 - Non-root user, no host secrets, no Docker socket mounted into the workload.
 - Result fields: `task_id`, `trace_id`, `operation`, `exit_code`, `timed_out`,
-  `stdout`, `stderr`, `duration_ms`, `artifact_refs`.
+  `passed`, `stdout`, `stderr`, `duration_ms`, `artifact_refs`, `simulation`,
+  and `host_execution`.
 - Cleanup removes only directories that Plane 3 created for that task.
 
 The diagram label "FOAP tool calls" is not a published SDK. Tool calls are these
@@ -224,16 +235,18 @@ documents. Expiry is a separate decision from keeping both representations.
 ## Ports
 
 Plane 1 provides offline implementations of `FeasibilityRouter`, `TaskHandoff`,
-and `TelemetrySink`. The Gemini router is a second `FeasibilityRouter` and stays
-disabled until its configuration gates are all set. The remaining ports are still
-unimplemented.
+and `TelemetrySink`. Its default handoff still records the contract in memory
+and does not start the supervisor. Plane 2 provides `SupervisingHandoff`, which
+implements the same port, stores the supervised result, and still returns
+`execution_started` false. The Gemini router stays disabled until its
+configuration gates are all set. Plane 4 ports are still unimplemented.
 
 | Port | Caller | Behavior |
 | --- | --- | --- |
 | `FeasibilityRouter` | Plane 1 | `evaluate(submission) -> feasibility result`. Offline implementation required for tests. |
 | `TaskHandoff` | Plane 1 | `submit(handoff) -> acknowledgement` with `task_id` and `trace_id`. |
 | `TelemetrySink` | Any plane | `emit(envelope) -> event_id`. Offline implementation stores in memory for unit tests. |
-| `RuntimeExecutor` | Plane 2 | `execute(request) -> execution result`. Offline implementation is a simulation and must be labeled as one. |
+| `RuntimeExecutor` | Plane 2 | `execute(request) -> ExecutionResult`. `OfflineRuntimeSimulation` is labeled `simulation=true` and does not start Docker or run generated code. |
 | `RawEventStore` | Plane 4 | `append(envelope) -> event_id`. Idempotent. No update API for payload bytes. |
 | `Normalizer` | Plane 4 | `normalize(raw) -> outcome`. Offline fixtures required. Gemini adapter behind the same port. |
 | `CanonicalEventStore` | Plane 4 | `save(canonical)`. Must not write the raw collection. |

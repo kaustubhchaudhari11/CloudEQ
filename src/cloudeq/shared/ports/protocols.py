@@ -3,6 +3,8 @@
 from typing import Protocol
 
 from cloudeq.shared.contracts.models import (
+    ExecutionRequest,
+    ExecutionResult,
     FeasibilityResult,
     HandoffAcknowledgement,
     HandoffRequest,
@@ -29,3 +31,8 @@ class TelemetrySink(Protocol):
 class GeminiTransport(Protocol):
     def generate(self, *, model: str, api_key: str, user_text: str) -> str:
         """Return the model text. Callers treat that text as data."""
+
+
+class RuntimeExecutor(Protocol):
+    def execute(self, request: ExecutionRequest) -> ExecutionResult:
+        """Run one sandbox operation. Callers must not execute generated code themselves."""

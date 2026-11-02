@@ -12,18 +12,20 @@ provider. This project does not replace Gemini with Grok.
 
 ## Setup status
 
-Configuration and Plane 1 intake are in place. The API and CLI validate a prompt,
-route it with the offline feasibility adapter, and hand a feasible task to an
-in-memory Plane 2 port. That handoff does not run agents or containers.
-Planes 2–4, Kafka, MongoDB, Docker, and Grafana are not implemented.
+Configuration, Plane 1 intake, and the Plane 2 offline agent engine are in place.
+The API and CLI validate a prompt, route it with the offline feasibility adapter,
+and hand a feasible task to the default in-memory port. That default handoff does
+not run the supervisor. `cloudeq-agents run` runs a labeled offline simulation of
+the six SDLC stages and the Developer–Tester loop. It does not call CrewAI,
+Gemini, Docker, Kafka, or MongoDB. Plane 3 and Plane 4 are not implemented.
 Live Gemini calls stay disabled.
 
 Open this folder in Cursor, or open `FORGE-SPAN.code-workspace`. The always-applied
 rule is `.cursor/rules/cloudeq.mdc`. `.cursorrules` carries the same guidance.
 Keep their rule bodies synchronized.
 
-The next session is Plane 1. Use `docs/CURSOR_START_PROMPT.md`. Do not start from
-`docs/CURSOR_BUILD_PROMPT.md` unless the task is the full five-milestone build.
+The next session is Plane 3, sandboxed execution, in `docs/CURSOR_BUILD_PROMPT.md`.
+Plane 1's prompt remains `docs/CURSOR_START_PROMPT.md`.
 
 ## Workspace structure
 
@@ -65,8 +67,9 @@ The next session is Plane 1. Use `docs/CURSOR_START_PROMPT.md`. Do not start fro
 `-- scripts/
 ```
 
-`src/cloudeq` packages contain markers only. `tests/` has no test modules yet.
-`.env.example` has empty secrets and offline defaults. Do not commit `.env`.
+Plane 1 and Plane 2 contain application code. Plane 3 and Plane 4 are still
+package markers. `.env.example` has empty secrets and offline defaults. Do not
+commit `.env`.
 
 ## References in Cursor
 
@@ -109,8 +112,8 @@ uv run pytest
 ```
 
 `uv sync` creates `.venv` in this folder and installs the package, FastAPI,
-Uvicorn, httpx, pytest, Ruff, and mypy. It does not install CrewAI, a Kafka
-client, MongoDB, Docker, or Grafana, and it does not call Gemini.
+Uvicorn, httpx, PyYAML, pytest, Ruff, and mypy. It does not install CrewAI, a
+Kafka client, MongoDB, Docker, or Grafana, and it does not call Gemini.
 
 Expected results on this machine:
 
@@ -118,8 +121,9 @@ Expected results on this machine:
 - Python is 3.12.x and below 3.14. This machine used 3.12.2.
 - `imports-ok` prints after the import command.
 - Ruff and mypy exit 0.
-- `uv run pytest` exits 0. Plane 1 tests pass without live services. A passing
-  test is not evidence that Planes 2–4 or a live Gemini call work.
+- `uv run pytest` exits 0. Plane 1 and Plane 2 tests pass without live services.
+  A passing test is not evidence that CrewAI, Gemini, Docker, Kafka, MongoDB,
+  or Grafana ran.
 
 If `uv` is missing, install it from [Astral's uv documentation](https://docs.astral.sh/uv/getting-started/installation/) and open a new shell. If `py -3.12` fails, install CPython 3.12. The project rejects 3.14 because current CrewAI does not support it. Library versions and that constraint are in `docs/architecture/decisions.md`.
 
@@ -149,13 +153,31 @@ $body = @{ source = "api"; prompt = "Add a health check" } | ConvertTo-Json
 Invoke-RestMethod http://127.0.0.1:8000/tasks -Method Post -ContentType "application/json" -Body $body
 ```
 
-`status` `handed_off` and `execution_started` `$false` mean the task was accepted
-for a later plane. They do not mean code was generated. Stop the server with Ctrl+C.
+`status` `handed_off` and `execution_started` `$false` mean the default in-memory
+port accepted the contract. They do not mean the supervisor ran or that code was
+generated. Stop the server with Ctrl+C.
 A blank prompt exits the CLI with code 2. A named dataset is routed as infeasible:
 
 ```powershell
 uv run cloudeq-intake submit --prompt "Use the corpus" --dataset "corpus-v1"
 ```
+
+## Offline Plane 2 demo
+
+This command runs the labeled simulation. `simulation` is true, `live_crewai`
+and `live_gemini` are false, and `host_execution` is false. A pass runs DevOps
+only after the simulated test result. It does not prove live CrewAI or Gemini
+execution, and it does not execute generated code.
+
+```powershell
+Set-Location C:\Users\kaust\projects\CloudEQ
+$env:CLOUDEQ_AGENT_ENGINE = "offline"
+$env:CLOUDEQ_REPAIR_MAX_ITERATIONS = "3"
+uv run cloudeq-agents run --prompt "Add a health check"
+```
+
+Exit 0 is `passed`. Exit 2 is `failed_budget_exhausted`. Exit 3 is `cancelled`.
+Exit 1 is `error`, including a CrewAI engine request that refuses kickoff.
 
 ## Roadmap
 
@@ -163,15 +185,15 @@ Status is in `docs/implementation-status.md`.
 
 1. Configuration — done.
 2. Plane 1, intake — offline API and CLI are implemented. Ticket adapters are not.
-3. Plane 2, agent orchestration — next. Use `docs/CURSOR_BUILD_PROMPT.md` milestone 2.
-4. Plane 3, sandboxed execution.
+3. Plane 2, agent orchestration — offline supervisor, repair loop, and handoff port are implemented. Live CrewAI is not.
+4. Plane 3, sandboxed execution — next. Replace `OfflineRuntimeSimulation` with the Docker `RuntimeExecutor`.
 5. Plane 4, observability.
 6. Integration and demonstration.
 
 ## GitHub and team contribution
 
 The private repository is [kaustubhchaudhari11/CloudEQ](https://github.com/kaustubhchaudhari11/CloudEQ).
-Plane 1 work is on `feature/plane1-intake` and is not pushed by this session. It is independent of any repository in the parent directory. See
+Plane 2 work is on `feature/plane2-agents` and is not pushed by this session. It is independent of any repository in the parent directory. See
 `CONTRIBUTING.md`. A pull-request template is under `.github/`.
 
 Do not rename the GitHub repository to match the product name.
