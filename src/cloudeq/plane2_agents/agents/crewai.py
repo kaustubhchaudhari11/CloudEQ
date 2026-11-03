@@ -1,8 +1,7 @@
 """Injectable CrewAI boundary for one SDLC stage.
 
-Live kickoff is implemented and stays behind explicit Gemini configuration.
-This module does not execute generated code, and the supervisor does not treat
-a live kickoff as an end-to-end success while Plane 3 is absent.
+Live kickoff is implemented and stays behind explicit Gemini configuration
+plus the container runtime. This module does not execute generated code.
 """
 
 from collections.abc import Callable

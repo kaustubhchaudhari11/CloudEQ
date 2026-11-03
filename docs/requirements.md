@@ -49,7 +49,7 @@ FOAP's seven layers are Source systems, Source data, Streaming, Event-driven, Pr
 
 ## Requirements
 
-Plane 1 and Plane 2 checks that have run are in the traceability section. Plane 3 and Plane 4 checks are still planned.
+Plane 1, Plane 2, and Plane 3 checks that have run are in the traceability section. Plane 4 checks are still planned. The Plane 3 container checks use an injected Docker runner. The live container smoke test was not run because the Docker engine was unavailable. Live Gemini was not called.
 
 | ID | Requirement | Source | Plane | Planned acceptance check |
 | --- | --- | --- | --- | --- |
@@ -104,9 +104,12 @@ Plane 1 and Plane 2 checks that have run are in the traceability section. Plane 
 | R8 | `agents.yaml` version 1 is loaded before stages. A missing or incomplete file returns `error` and makes no runtime call. |
 | R9 | Tests cover a first-attempt pass, fail-then-pass, budget exhaustion, and cancellation. DevOps is recorded only after `passed`. |
 | R10 | The default maximum is 3. A maximum below 1 returns `error` before stages. A budget of 3 records three failing iterations and stops. |
-| R11 | The supervisor rejects a runtime result that reports host execution. Generated code was not run on the host. Gemini did not write code in this session. Docker isolation belongs to Plane 3. |
-| R27 | Intake and agent events for one task share `trace_id` and `task_id`, including repair iterations. |
-| R28 | Source scans fail if Plane 1 or Plane 2 imports another plane's package. |
-| R29 | `uv run pytest` uses the offline router, the in-memory handoff, and the labeled runtime simulation. |
-| R30 | The intake sink rejects denied attribute keys and oversized payloads. Plane 4 raw retention is not implemented. |
-| R1, R12–R26 | Unchanged. They belong to later planes or to documentation already recorded. |
+| R11 | The supervisor rejects a runtime result that reports host execution. Container results set `host_execution` false. The injected-runner tests do not execute generated code on the host. Live Gemini was not called. |
+| R12 | `DockerRuntimeExecutor` returns exit code, bounded streams, duration, and artifact references for `write_file` and `run_tests`. Passing and failing test results were checked with an injected runner. A real container smoke test was not run. |
+| R13 | Policy tests reject a network other than `none`, a Docker socket mount, root, host execution, and Git push. The Docker CLI is installed (25.0.3) and the engine was not running, so the live container check was not run. E2B is not installed. |
+| R14 | `git_commit` is rejected while `CLOUDEQ_RUNTIME_ALLOW_GIT_COMMIT=false`. The same rejection holds when the flag is true, because the executor does not run Git on the host. There is no push operation. |
+| R27 | Intake, agent, and runtime events for one task share `trace_id` and `task_id`. Plane 4 does not store them yet. |
+| R28 | Source scans fail if Plane 1, Plane 2, or Plane 3 imports another plane's package. `src/cloudeq/composition.py` is the allowed wiring point. |
+| R29 | `uv run pytest` uses the offline router, the in-memory handoff, the labeled runtime simulation, and an injected Docker runner. The live smoke test skips when `docker info` fails. |
+| R30 | The intake sink rejects denied attribute keys and oversized payloads. Plane 3 events omit file contents, test output, and daemon error text. Plane 4 raw retention is not implemented. |
+| R1, R15–R26 | Unchanged. They belong to later planes or to documentation already recorded. |

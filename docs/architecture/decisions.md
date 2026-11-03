@@ -68,12 +68,23 @@ That lock resolved `google-genai` 1.65.0. CrewAI's own constraint is
 The model id stays empty until someone sets it. Official docs:
 [CrewAI 1.15.34](https://pypi.org/project/crewai/1.15.34/) and
 [CrewAI LLMs](https://docs.crewai.com/v1.15.34/en/concepts/llms).
-Installing the package does not prove a live kickoff. Live mode returns
-execution unavailable until Plane 3 provides a container executor.
+Installing the package does not prove a live kickoff. A real stage client
+runs only through the composition root when the container backend, live-call
+flag, API key, and explicit model id are all present. The default CLI does
+not construct that client.
 
 ### Runtime and storage
 
 - Docker is the sandbox backend. The diagram also names E2B. E2B is not configured.
+- Plane 3 calls the Docker CLI with an argument list. The Python Docker SDK
+  is not installed. Unit tests inject the command runner and do not need a daemon.
+- The sandbox image is `cloudeq-runtime:py3.12-pytest9.2.0`, built from
+  `python:3.12-slim` by `infra/runtime/Dockerfile` with pytest 9.2.0.
+  The container user is `65534:65534`. The process limit is 64. Network,
+  memory, and CPU defaults remain `none`, `512m`, and `1`.
+- The Docker CLI subprocess receives a reduced environment. Host API keys are
+  not forwarded, and `docker.sock` is not mounted. Cleanup is limited to the
+  container name and workspace directory created for that task.
 - Proposal prose requires a sandbox and does not name Docker or E2B. Those product
   names come from the diagram.
 - MongoDB is the dual-retention database. PostgreSQL remains the alternative
@@ -105,9 +116,11 @@ Flash as the prototype normalizer. That is evidence, not this project's model ID
 
 Shared types and ports are specified in `docs/architecture/contracts.md`.
 Requirements and checks are in `docs/requirements.md`.
-Plane 1 and Plane 2 contain application code. Plane 3 and Plane 4 remain
-package markers. `RuntimeExecutor` is the only path from the supervisor to a
-sandbox. The current implementation is `OfflineRuntimeSimulation`.
+Plane 1, Plane 2, and Plane 3 contain application code. Plane 4 remains a
+package marker. `RuntimeExecutor` is the only path from the supervisor to a
+sandbox. The default implementation is `OfflineRuntimeSimulation`.
+`DockerRuntimeExecutor` is the container implementation and is wired in
+`src/cloudeq/composition.py`.
 
 ## Still unresolved
 
