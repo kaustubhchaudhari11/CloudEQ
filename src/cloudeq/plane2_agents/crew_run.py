@@ -58,14 +58,29 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             "and this is not an end-to-end success.",
             "crewai-execution-unavailable",
         )
-    if client.uses_live_provider or backend != "mock":
+    if client.uses_live_provider:
+        if backend != "container":
+            return _error(
+                supervisor,
+                handoff,
+                "Container execution is unavailable. A live stage client runs only "
+                "with the container backend, and this is not an end-to-end success.",
+                "crewai-execution-unavailable",
+            )
+        try:
+            require_live_gemini(supervisor.settings)
+        except CrewConfigurationError as exc:
+            return _error(supervisor, handoff, exc.reason, "crewai-configuration-error")
+    elif backend not in {"mock", "container", "container-mock"}:
         return _error(
             supervisor,
             handoff,
-            "Container execution is unavailable. Live CrewAI mode cannot use a "
-            "simulated runtime or claim an end-to-end success before Plane 3.",
+            "Container execution is unavailable. The offline simulation cannot "
+            "satisfy CrewAI mode.",
             "crewai-execution-unavailable",
         )
+    run_engine = "crewai-container" if backend == "container" else "crewai-mocked"
+    run_kind = "container" if backend == "container" else "mocked"
 
     stages: list[StageOutput] = []
     try:
@@ -80,8 +95,8 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                         devops_ran=False,
                         reason=f"Cancelled before {stage.value}.",
                         simulation=False,
-                        engine="crewai-mocked",
-                        execution_kind="mocked",
+                        engine=run_engine,
+                        execution_kind=run_kind,
                     )
                 )
             draft = _draft(client, team, handoff, stage, None, "")
@@ -93,7 +108,9 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
         CrewIdentityError,
         CrewConfigurationError,
     ) as exc:
-        return _error(supervisor, handoff, exc.reason, _client_error_engine(exc), stages=stages)
+        return _error(
+            supervisor, handoff, exc.reason, _client_error_engine(exc, run_engine), stages=stages
+        )
 
     iterations: list[RepairIteration] = []
     state = RepairState.RUNNING
@@ -119,7 +136,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                 write,
                 handoff=handoff,
                 operation=RuntimeOperation.WRITE_FILE,
-                expect_simulation=False,
+                expect_simulation=backend == "container-mock",
             )
             if problem is not None:
                 raise RuntimeExecutionError(problem)
@@ -137,7 +154,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                 tested,
                 handoff=handoff,
                 operation=RuntimeOperation.RUN_TESTS,
-                expect_simulation=False,
+                expect_simulation=backend == "container-mock",
             )
             if problem is not None:
                 raise RuntimeExecutionError(problem)
@@ -199,13 +216,18 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             supervisor,
             handoff,
             exc.reason,
-            _client_error_engine(exc),
+            _client_error_engine(exc, run_engine),
             stages=stages,
             iterations=iterations,
         )
     except RuntimeExecutionError as exc:
         return _error(
-            supervisor, handoff, exc.reason, "crewai-mocked", stages=stages, iterations=iterations
+            supervisor,
+            handoff,
+            exc.reason,
+            run_engine,
+            stages=stages,
+            iterations=iterations,
         )
 
     if iterations:
@@ -235,7 +257,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                 supervisor,
                 handoff,
                 exc.reason,
-                _client_error_engine(exc),
+                _client_error_engine(exc, run_engine),
                 stages=stages,
                 iterations=iterations,
             )
@@ -260,9 +282,9 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             iterations=iterations,
             devops_ran=devops_ran,
             reason=reason,
-            simulation=False,
-            engine="crewai-mocked",
-            execution_kind="mocked",
+            simulation=backend == "container-mock",
+            engine=run_engine,
+            execution_kind=run_kind,
         )
     )
 
@@ -323,6 +345,8 @@ def _error(
     kind = "configuration-error" if engine == "crewai-configuration-error" else "unavailable"
     if engine == "crewai-mocked":
         kind = "mocked"
+    elif engine == "crewai-container":
+        kind = "container"
     return _as_result(
         supervisor._finish(
             handoff,
@@ -338,7 +362,7 @@ def _error(
     )
 
 
-def _client_error_engine(exc: Exception) -> str:
-    return (
-        "crewai-configuration-error" if isinstance(exc, CrewConfigurationError) else "crewai-mocked"
-    )
+def _client_error_engine(exc: Exception, engine: str) -> str:
+    if isinstance(exc, CrewConfigurationError):
+        return "crewai-configuration-error"
+    return engine

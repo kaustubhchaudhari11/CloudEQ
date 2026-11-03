@@ -159,9 +159,16 @@ def normalize_relative_path(value: str) -> str:
         raise ValueError("Runtime paths must be non-empty relative POSIX paths.")
     if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
         raise ValueError("Runtime paths must stay inside the task workspace.")
+    if any(char in value for char in ':<>"|?*') or any(ord(char) < 32 for char in value):
+        raise ValueError("Runtime paths contain unsafe characters.")
     parts = value.split("/")
     if any(part in {"", ".", ".."} for part in parts):
         raise ValueError("Runtime paths cannot contain empty, current, or parent segments.")
+    reserved = {"CON", "PRN", "AUX", "NUL"}
+    reserved.update(f"COM{i}" for i in range(1, 10))
+    reserved.update(f"LPT{i}" for i in range(1, 10))
+    if any(part.endswith((" ", ".")) or part.split(".")[0].upper() in reserved for part in parts):
+        raise ValueError("Runtime paths contain unsafe Windows names.")
     return "/".join(parts)
 
 

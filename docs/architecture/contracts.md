@@ -124,32 +124,42 @@ Repair loop states: `running`, `passed`, `failed_budget_exhausted`, `cancelled`,
 - Each iteration records its number, termination reason, and related `trace_id`.
 - Exhausting the budget is a completed failure result, not a crash that drops telemetry.
 
-Plane 2 calls Plane 3 only through the runtime port. The current adapter,
-`OfflineRuntimeSimulation`, sets `simulation` true and `execution_backend` to
-`simulation`. It does not start a container. A result with `host_execution` true
-is an error, and DevOps does not run.
+Plane 2 calls Plane 3 only through the runtime port. `OfflineRuntimeSimulation`
+sets `simulation` true and `execution_backend` to `simulation`. It remains the
+default. `DockerRuntimeExecutor` sets `execution_backend` to `container` only with the real Docker CLI runner. Injected runners use `container-mock` and set `simulation` true. Real completed operations set `simulation` false. A result with
+`host_execution` true is an error, and DevOps does not run.
 
-Live CrewAI mode requires `CLOUDEQ_GEMINI_LIVE_CALLS=true`, a non-empty
-`GEMINI_API_KEY`, and an explicit `GEMINI_AGENT_MODEL`. It still cannot return
-`passed` while the runtime backend is `simulation` or `mock` labeled as live.
-A mocked test client is not a live Gemini call. Agent text is not a test pass.
-Only `ExecutionResult.passed` from a non-simulated runtime result can pass,
-and that result must match the handoff task and trace ids.
+`src/cloudeq/composition.py` is the wiring point. It may import Plane 2 and
+Plane 3. Neither plane imports the other. The default CLI stays on
+`OfflineRuntimeSimulation`.
+
+A real CrewAI stage client runs only when `execution_backend` is `container`
+and `CLOUDEQ_GEMINI_LIVE_CALLS=true`, a non-empty `GEMINI_API_KEY`, and an
+explicit `GEMINI_AGENT_MODEL` are all present. A missing gate returns a
+configuration or availability error and does not call `run_stage`. A fake
+stage client may use the `mock`, `container-mock`, or `container` backend. That fake is not a
+live Gemini call. Agent text is not a test pass. Only `ExecutionResult.passed`
+from the selected runtime can pass, and that result must match the handoff
+task and trace ids. Mocked container results remain explicitly simulated. DevOps runs only after that pass.
 
 ## Runtime execution
 
 Operations: `write_file`, `run_tests`, `git_commit`.
 
 `ExecutionRequest.files` carries workspace files. Each path is a relative POSIX
-path with no parent segment. Each file has exactly one of content or a safe
-relative artifact reference. `ExecutionRequest.test_plan.commands` must be copied from
-`TEST_COMMAND_ALLOWLIST`. The only entry is `python -m pytest`. Plane 2 does
-not execute the command or write the files. Runtime adapters raise the shared
-`RuntimeExecutionError` when no trustworthy `ExecutionResult` can be returned.
+path with no parent segment. The shared model still allows exactly one of
+content or a safe relative artifact reference. `DockerRuntimeExecutor` rejects
+every artifact reference until a resolver can prove the target stays inside
+the task workspace. `ExecutionRequest.test_plan.commands` must be copied from
+`TEST_COMMAND_ALLOWLIST`. The only entry is `python -m pytest`, and a test run
+accepts that one command. Plane 2 does not execute the command or write the
+files. Runtime adapters raise the shared `RuntimeExecutionError` when no
+trustworthy `ExecutionResult` can be returned.
 
 There is no `git_push` operation. `CLOUDEQ_RUNTIME_ALLOW_GIT_PUSH` stays false.
-`git_commit` is rejected unless `CLOUDEQ_RUNTIME_ALLOW_GIT_COMMIT=true`, and even
-then it may run only inside the task workspace. The diagram's Git commit box does
+`git_commit` stays rejected while `CLOUDEQ_RUNTIME_ALLOW_GIT_COMMIT=false`.
+Turning that flag true still does not run Git on the host. The runtime image
+does not provide a container Git commit. The diagram's Git commit box does
 not authorize committing or pushing the CloudEQ repository.
 
 `CLOUDEQ_RUNTIME_ALLOW_HOST_EXECUTION` stays false. Generated code runs only in
@@ -158,15 +168,34 @@ by the diagram and is not configured.
 
 Execution policy for the Docker backend:
 
-- Per-task workspace under `CLOUDEQ_RUNTIME_WORKSPACE_ROOT`, path-checked so the
-  task cannot escape that root.
-- Network `none`, memory `512m`, CPUs `1`, timeout 120 seconds, unless a later
-  decision changes the environment defaults.
-- Non-root user, no host secrets, no Docker socket mounted into the workload.
+- `write_file` stores validated file bytes in the task workspace. It does not
+  execute those bytes. `run_tests` is the container operation.
+- Per-task workspace under `CLOUDEQ_RUNTIME_WORKSPACE_ROOT`. The root must be
+  outside the CloudEQ repository, and it cannot contain that repository. The
+  default is `~/.cloudeq/runtime_workspaces`. Task directories are claimed
+  exclusively and tied to a trace id. Task ids, relative paths, symlinks, and
+  junctions are checked so one task cannot read the repository or another task's workspace.
+  File count and size use the shared limits.
+- The container command is an argument list: `docker run` with `--network none`,
+  `--memory 512m`, `--cpus 1`, `--pids-limit 64`, `--user 65534:65534`,
+  `--cap-drop ALL`, `--security-opt no-new-privileges`, a read-only root
+  filesystem, and one read-only mount of that task workspace. Pytest uses a
+  bounded temporary filesystem and does not write cache or bytecode to the mount. The timeout
+  default is 120 seconds. The process environment passed to the Docker CLI
+  omits host secrets.
+- The image is `cloudeq-runtime:py3.12-pytest9.2.0`, built from
+  `infra/runtime/Dockerfile`. Its base is `python:3.12-slim` and it installs
+  pytest 9.2.0 because that is the allowlisted test runner. No Docker socket
+  is mounted.
 - Result fields: `task_id`, `trace_id`, `operation`, `exit_code`, `timed_out`,
   `passed`, `stdout`, `stderr`, `duration_ms`, `artifact_refs`, `simulation`,
-  and `host_execution`.
-- Cleanup removes only directories that Plane 3 created for that task.
+  and `host_execution`. Output is bounded by `CLOUDEQ_RUNTIME_OUTPUT_LIMIT`.
+  Completed container operations set `simulation` false and `host_execution` false.
+- Plane 3 telemetry carries the operation, exit code, pass flag, timeout,
+  duration, and file count. It does not copy file contents, test output, or
+  daemon error text.
+- Cleanup removes only the unique container name after a timeout and task directory this executor
+  created for that task.
 
 The diagram label "FOAP tool calls" is not a published SDK. Tool calls are these
 runtime operations.
