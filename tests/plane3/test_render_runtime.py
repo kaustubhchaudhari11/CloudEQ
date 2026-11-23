@@ -56,6 +56,7 @@ def setup_runner(tmp_path: Path, fake: FakeSandboxes) -> tuple[Any, Any]:
     wheels = tmp_path / "wheels"
     wheels.mkdir()
     (wheels / "pytest-9.2.0-py3-none-any.whl").write_bytes(b"fixture")
+    (wheels / "flask-3.1.3-py3-none-any.whl").write_bytes(b"fixture")
     settings = RenderRuntimeSettings(
         render_api_key="local-test-key",
         render_workspace_id="tea-test",
@@ -87,6 +88,7 @@ def test_remote_exit_status_is_authoritative_and_cleanup_runs(tmp_path: Path, co
     assert fake.terminated == ["sbx-owned-test"]
     assert fake.uploads[-1][1] == "/tmp/forge-task"
     assert "--no-index" in fake.commands[0]
+    assert "Flask==3.1.3" in fake.commands[0]
 
 
 @pytest.mark.parametrize("broken", ["network", "no-exit", "cleanup"])

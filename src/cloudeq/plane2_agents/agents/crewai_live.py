@@ -123,8 +123,10 @@ def _description(request: StageRunRequest) -> str:
         output = (
             "Return files containing the complete implementation AND test_*.py pytest tests. "
             "Use flat relative paths such as health.py and test_health.py. "
-            "The test environment has Python 3.11 and pytest only, with networking disabled. "
-            "Use the standard library; do not require other packages, installs, or shell commands. "
+            "The hosted test environment has Python 3.11, pytest, and Flask 3.1.3, "
+            "with networking disabled. For Flask web apps, use app.test_client() in tests. "
+            "Use the standard library or Flask; do not require other packages, installs, "
+            "browser automation, a listening server, or shell commands. "
             "Set test_commands to an empty array."
         )
     elif request.stage is StageName.TESTING:

@@ -94,7 +94,7 @@ def test_live_stage_prompts_describe_the_supported_runtime() -> None:
             assert 'test_commands=["python -m pytest"]' in prompt
         elif stage is StageName.DEVELOPMENT:
             assert "implementation AND test_*.py" in prompt
-            assert "Python 3.11 and pytest only" in prompt
+            assert "Python 3.11, pytest, and Flask 3.1.3" in prompt
         else:
             assert "files=[] and test_commands=[]" in prompt
 

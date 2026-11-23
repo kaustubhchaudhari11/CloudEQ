@@ -54,8 +54,11 @@ class RenderSandboxRunner:
         workspace = Path(spec.workspace_host)
         self._validate_workspace(workspace)
         wheels = Path(self.settings.cloudeq_render_wheels_dir)
-        if not wheels.is_dir() or not list(wheels.glob("pytest-9.2.0-*.whl")):
-            raise RuntimeExecutionError("The trusted pytest wheel bundle is missing.")
+        if not wheels.is_dir() or any(
+            not list(wheels.glob(pattern))
+            for pattern in ("pytest-9.2.0-*.whl", "flask-3.1.3-*.whl")
+        ):
+            raise RuntimeExecutionError("The trusted pytest/Flask wheel bundle is missing.")
         return asyncio.run(self._run(spec, workspace, wheels))
 
     @staticmethod
@@ -110,7 +113,7 @@ class RenderSandboxRunner:
                         sandbox_id,
                         "python3 -m venv /tmp/forge-venv && "
                         "/tmp/forge-venv/bin/python -m pip install --no-index "
-                        "--find-links=/tmp/forge-wheels pytest==9.2.0",
+                        "--find-links=/tmp/forge-wheels pytest==9.2.0 Flask==3.1.3",
                         spec.output_limit,
                     )
                     if prepared.exit_code != 0:

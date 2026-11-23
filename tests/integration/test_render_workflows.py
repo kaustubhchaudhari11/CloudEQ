@@ -53,6 +53,7 @@ def test_template_route_preserves_live_configuration_and_labels_mock(
     wheels = tmp_path / "wheels"
     wheels.mkdir()
     (wheels / "pytest-9.2.0-py3-none-any.whl").write_bytes(b"test fixture")
+    (wheels / "flask-3.1.3-py3-none-any.whl").write_bytes(b"test fixture")
     fake = SandboxDouble()
     runner = RenderSandboxRunner(
         RenderRuntimeSettings(

@@ -28,8 +28,9 @@ cancel it and reload the website to use the new sign-in form.
    DevOps. Verify live Gemini/CrewAI flags and actual pytest output. Model text
    alone is never accepted as a successful test result.
 5. Review the generated source and tests. The hosted test environment currently
-   supports Python 3.11 standard-library code and pytest; it cannot install
+   supports Python 3.11 standard-library code, pytest, and Flask 3.1.3; it cannot install
    arbitrary dependencies or make outbound network requests.
+   Flask tests use `app.test_client()`; no listening web server is needed.
 
 For a narrowly specified example, use: **Create health.py with a health_check()
 function returning {"status":"ok"}, and test_health.py with pytest tests.**

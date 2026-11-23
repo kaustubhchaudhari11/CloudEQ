@@ -62,6 +62,12 @@ with a server-side lifetime as a fallback. Git commits and pushes stay disabled.
 The hosted app runs Python 3.12; Render's current default test image was verified
 as Python 3.11.2. Generated test tasks must support Python 3.11 or later. Tests
 run as UID 65534 with no-new-privileges and a read-only uploaded task tree.
+The trusted package bundle now includes Flask 3.1.3 and its pinned dependencies
+alongside pytest. Linux wheels for Python 3.11 and 3.12 are downloaded during the
+trusted build, then installed with `--no-index` before any task files are uploaded.
+Generated tasks cannot install arbitrary packages. Flask's test client exercises
+web routes without a listening server or outbound access. Local Docker users
+must rebuild the runtime image to receive the same Flask dependency.
 Sandbox compute and Gemini usage are additional to the standing service bill.
 
 The deployment explicitly uses `gemini-3.5-flash-lite`. On November 23, 2026,
