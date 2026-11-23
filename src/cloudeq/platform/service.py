@@ -209,7 +209,11 @@ class Platform:
             "router_mode": self.intake.settings.cloudeq_router_mode,
             "live_gemini": self._live_gemini(),
             "repair_max_iterations": self.settings.cloudeq_repair_max_iterations,
-            "runtime_image": self.runtime_settings.cloudeq_runtime_image,
+            "runtime_image": (
+                "Render default Linux image"
+                if self.mode == "render"
+                else self.runtime_settings.cloudeq_runtime_image
+            ),
             "observability": self.observability.describe(),
         }
 

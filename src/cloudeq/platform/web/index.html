@@ -325,7 +325,7 @@ document.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
 $("ext-rich").onclick = () => ext({actor_id: "planner-agent", target_id: "coder-agent", event_type: "Handoff", action: "delegate", status: "success", latency_ms: 42, span_id: "sp-1", tool_name: "search", metadata: {tokens: 812}});
 $("ext-drift").onclick = () => ext({agent_id: "qa-agent", kind: "TEST", outcome: "failed", elapsed_ms: 1310, data_size_kb: 3.5, extra_field: "kept in raw"});
 $("ext-bad").onclick = () => ext("<<not json: agent crashed mid-write>>");
-$("retry").onclick = async () => { const r = await api("/observability/retry?normalizer=offline", {method: "POST"}); $("ext-out").style.display = ""; $("ext-out").textContent = JSON.stringify(r.body, null, 2); loadMetrics(); };
+$("retry").onclick = async () => { const r = await api("/observability/retry?normalizer=configured", {method: "POST"}); $("ext-out").style.display = ""; $("ext-out").textContent = JSON.stringify(r.body, null, 2); loadMetrics(); };
 
 loadConfig().then(loadMetrics);
 setInterval(loadMetrics, 10000);

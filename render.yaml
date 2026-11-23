@@ -34,11 +34,11 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_AGENT_MODEL
-        value: gemini-3.1-flash-lite
+        value: gemini-3.5-flash-lite
       - key: GEMINI_ROUTER_MODEL
-        value: gemini-3.1-flash-lite
+        value: gemini-3.5-flash-lite
       - key: GEMINI_NORMALIZER_MODEL
-        value: gemini-3.1-flash-lite
+        value: gemini-3.5-flash-lite
       - key: CLOUDEQ_GEMINI_TIMEOUT_SECONDS
         value: "60"
       - key: CLOUDEQ_REPAIR_MAX_ITERATIONS

@@ -18,6 +18,9 @@ Confirm the explicit Gemini model IDs are available to the key's project.
 
 Render generates separate app and Grafana passwords. The username is `forge`.
 Retrieve passwords from the corresponding service's private environment settings.
+The app provides `/login` with an eight-hour signed session cookie (Secure,
+HttpOnly, SameSite=Strict). API clients and Grafana can still use HTTP Basic
+authentication over HTTPS or the workspace's private service connection.
 Only the web app's minimal `/health` endpoint is anonymous; the dashboard, API,
 API documentation, and observability endpoints require authentication. Grafana
 reads the app through its private HTTP API; it never receives `MONGODB_URI`.
@@ -56,7 +59,16 @@ fixed test harness are uploaded; application credentials are never included.
 The only permitted test command is `python -m pytest`. Tests have memory, process,
 CPU, output, and time limits. Each environment is terminated after its attempt,
 with a server-side lifetime as a fallback. Git commits and pushes stay disabled.
+The hosted app runs Python 3.12; Render's current default test image was verified
+as Python 3.11.2. Generated test tasks must support Python 3.11 or later. Tests
+run as UID 65534 with no-new-privileges and a read-only uploaded task tree.
 Sandbox compute and Gemini usage are additional to the standing service bill.
+
+The deployment explicitly uses `gemini-3.5-flash-lite`. On November 23, 2026,
+`gemini-3.1-flash-lite` returned provider overload (503), and the older 2.5 model
+was unavailable to this key. A direct 3.5 Flash Lite request succeeded before
+changing the three model settings. Model availability does not prove the whole
+agent workflow; record that separately below.
 
 ## Verification and recovery
 
