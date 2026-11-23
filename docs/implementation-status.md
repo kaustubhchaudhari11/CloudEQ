@@ -1,5 +1,17 @@
 # FORGE SPAN implementation status
 
+## Current evaluation entry point — November 23, 2026
+
+Use the root README for current setup and execution instructions. The complete
+Drive project plus deployment corrections is on `deploy/render-full-stack`.
+All four planes and the integrated dashboard are present. Current evidence and
+remaining provider limitations are in `DEPLOYMENT_VERIFICATION.md`; source lineage
+is in `SOURCE_PROVENANCE.md`.
+
+The sections below are historical session records. Statements such as "Plane 4
+is not implemented" and "live Gemini was not called" describe those earlier
+milestones, not the current integration branch.
+
 ## Session 2026-11-11: Plane 4 and integration
 
 Added:

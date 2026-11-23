@@ -85,3 +85,31 @@ execution remain disabled.
 No AWS account or local Docker Desktop is needed to use the hosted app. Render
 still builds the service from a Dockerfile and provides remote isolated test
 environments; this is not a claim that the hosting platform uses no containers.
+
+## Submission reproducibility check — November 23, 2026
+
+Cloned `deploy/render-full-stack` directly from GitHub into a new directory at
+commit `d24530c`, without copying the developer environment or any credentials.
+`uv sync --locked --python 3.12` installed the application successfully using
+Python 3.12.2. The fresh clone passed **134 tests, 1 skipped**; the skip was the
+real Docker smoke test because the local engine was stopped. Ruff checks and
+format checks passed. Type-checking initially identified a missing optional
+Render client, so the README now explicitly installs `--all-extras` for checks.
+After that install, mypy passed for all 68 source files.
+
+An actual local HTTP server started from that clone with safe `.env.example`
+defaults. Five HTTP scenarios returned the expected outcomes: first-attempt pass,
+two failures then a third-attempt pass, exhausted three-attempt budget without
+DevOps, infeasible dataset routing, and blank-prompt rejection (HTTP 422). The
+first successful task had 20 correlated events with canonical records. These
+were **simulation runs**, not a new live Gemini or local Docker verification.
+
+The HTTP-check assertions passed. Its temporary-directory cleanup briefly
+encountered a Windows file lock after server shutdown; no application code or
+user data was changed by that cleanup failure. The server process subsequently
+exited. No additional live model request was made during the submission check.
+
+The source comparison in `SOURCE_PROVENANCE.md` verifies that all 127 downloaded
+Drive project files are represented in the GitHub integration branch. The root
+README now replaces contradictory milestone notes with current clone, dependency,
+environment, local Part 1/Part 2, and optional service-stack instructions.
