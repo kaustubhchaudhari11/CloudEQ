@@ -82,11 +82,38 @@ def live_kickoff(settings: AgentSettings, request: StageRunRequest) -> str:
     except Exception as exc:
         if "timeout" in type(exc).__name__.lower():
             raise CrewStageTimeout("The Gemini stage call timed out.") from exc
-        raise CrewProviderError("The Gemini stage call failed.") from None
+        raise CrewProviderError(_provider_failure_message(exc)) from None
     raw = getattr(result, "raw", None)
     if not isinstance(raw, str) or not raw.strip():
         raise MalformedStageOutput("CrewAI returned no stage text.")
     return raw
+
+
+def _provider_failure_message(exc: Exception) -> str:
+    """Expose a useful status, never the provider's request or credential text."""
+    current: BaseException | None = exc
+    for _ in range(6):
+        if current is None:
+            break
+        code = getattr(current, "code", None) or getattr(current, "status_code", None)
+        if code is None:
+            code = getattr(getattr(current, "response", None), "status_code", None)
+        if str(code) in {"500", "502", "503", "504"}:
+            return (
+                f"Gemini is temporarily unavailable (HTTP {code}) after bounded retries. "
+                "Wait briefly and submit again. This is a model-provider failure, not Docker."
+            )
+        if str(code) == "429":
+            return (
+                "Gemini rate or quota limit reached (HTTP 429). "
+                "Check provider limits before retrying."
+            )
+        if str(code) in {"401", "403"}:
+            return (
+                f"Gemini access was denied (HTTP {code}). Check the private API-key configuration."
+            )
+        current = current.__cause__ or current.__context__
+    return "The Gemini stage call failed. No runtime test pass was recorded."
 
 
 def _description(request: StageRunRequest) -> str:

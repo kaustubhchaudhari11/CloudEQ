@@ -97,3 +97,19 @@ def test_live_stage_prompts_describe_the_supported_runtime() -> None:
             assert "Python 3.11 and pytest only" in prompt
         else:
             assert "files=[] and test_commands=[]" in prompt
+
+
+@pytest.mark.parametrize("code", [429, 503, 403])
+def test_provider_error_reports_status_without_secret_text(code: int) -> None:
+    from cloudeq.plane2_agents.agents.crewai_live import _provider_failure_message
+
+    class ProviderFailure(Exception):
+        def __init__(self) -> None:
+            super().__init__("private-api-key-and-request-body")
+            self.code = code
+
+    outer = RuntimeError("wrapper")
+    outer.__cause__ = ProviderFailure()
+    message = _provider_failure_message(outer)
+    assert str(code) in message
+    assert "private-api-key" not in message
