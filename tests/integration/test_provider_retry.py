@@ -79,3 +79,21 @@ def test_crewai_uses_bounded_native_provider_retries(monkeypatch: pytest.MonkeyP
     assert 503 in options.retry_options.http_status_codes
     assert 401 not in options.retry_options.http_status_codes
     assert options.timeout > 0
+
+
+def test_live_stage_prompts_describe_the_supported_runtime() -> None:
+    from tests.plane2.test_crewai_boundary import _request
+
+    from cloudeq.plane2_agents.agents.crewai_live import _description
+    from cloudeq.plane2_agents.models import StageName
+
+    for stage in StageName:
+        prompt = _description(_request(stage))
+        assert "only supported test command is exactly python -m pytest" in prompt
+        if stage is StageName.TESTING:
+            assert 'test_commands=["python -m pytest"]' in prompt
+        elif stage is StageName.DEVELOPMENT:
+            assert "implementation AND test_*.py" in prompt
+            assert "Python 3.11 and pytest only" in prompt
+        else:
+            assert "files=[] and test_commands=[]" in prompt
