@@ -1,5 +1,44 @@
 # FORGE SPAN implementation status
 
+## Session 2026-11-11: Plane 4 and integration
+
+Added:
+
+- `plane4_observability/`: `FederatedTelemetrySink` (shared `TelemetrySink` port: validate,
+  redact, publish), `InProcessBus` and `KafkaBus` (idempotent producer, acks=all, bounded
+  retries, commit-after-store consumer = at-least-once), `ObservabilityPipeline` (raw stored
+  before normalization, duplicate `event_id` absorbed, conflicts counted, failures keep raw and
+  record an attempt, retry), `OfflineNormalizer` and `GeminiNormalizer` (identity fields never
+  taken from model output), `CanonicalEvent` per FOAP Table 4 + `schema_version` + provenance,
+  `MemoryStore`, `SQLiteStore` (default), `MongoStore` (optional extra), retention that does
+  nothing until `FOAP_*_RETENTION_DAYS` is set, and an HTTP read API for Grafana Infinity.
+- `plane2_agents/agents/template.py`: deterministic, non-LLM stage client so the real Docker
+  runtime can run a genuine Developer–Tester repair loop (defect injected, container test
+  failure, fix). Labeled as template; `live_crewai`/`live_gemini` stay false.
+- `platform/`: composition root wiring all planes with one sink, `cloudeq-server`
+  (dashboard + APIs), `cloudeq-demo`, run history file.
+- `docker-compose.yml` (app, Kafka KRaft, MongoDB, Grafana), `infra/docker/Dockerfile`,
+  Grafana datasource + dashboard provisioning, `scripts/start*.ps1`.
+- Tests: `tests/plane4/test_pipeline.py`, `tests/integration/test_platform.py`.
+
+Checks run (Linux sandbox, Python 3.13, no network; FastAPI/pydantic-settings replaced by a
+local test-only stand-in because packages could not be downloaded):
+
+| Check | Result |
+| --- | --- |
+| pytest | 103 passed, 1 skipped (live Docker smoke test: no engine). |
+| ruff check / format --check | Pass. |
+| mypy strict | No errors in project code; remaining messages came from the test stand-in only. |
+| `cloudeq-demo` | All five scenarios behaved as expected. |
+| Dashboard in headless Chrome | Rendered; full run, trace, and health views working. |
+| Docker mode | Verified with an injected runner that runs the generated pytest (labeled `container-mock`). Real Docker not run: no engine. |
+| Kafka, MongoDB, Grafana, live Gemini | Not run. Configuration supplied, unverified here. |
+
+Run `uv sync` then `uv run pytest` on the target machine to confirm against the real packages.
+
+---
+
+
 Product: FORGE SPAN. Team: Cloud EQ. Technical identifiers remain `CloudEQ` / `cloudeq`.
 
 Plane 1 intake, the Plane 2 offline agent engine, and the CrewAI boundary are on `main` through pull request #4. This branch adds the Plane 3 Docker runtime. Plane 4 is not implemented. The default agent engine remains the offline simulation. Live Gemini was not called.

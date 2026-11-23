@@ -10,8 +10,77 @@ environment prefix. See `docs/PROJECT_IDENTITY.md`.
 Grok is the coding assistant in Cursor. Gemini is the application's runtime model
 provider. This project does not replace Gemini with Grok.
 
+## Quick start: run it and see it
+
+All four planes are implemented and wired together. From the repository root
+in Windows PowerShell:
+
+```powershell
+uv sync                      # installs everything (first run re-locks for the new extras)
+uv run cloudeq-server        # then open http://127.0.0.1:8000
+```
+
+Or double-click-style: `powershell -ExecutionPolicy Bypass -File scripts\start.ps1`.
+
+The dashboard lets you submit a prompt and watch it go through every plane:
+
+1. **Intake** validates and routes it (blank prompts are rejected, named datasets are infeasible).
+2. **Agents** run Requirements → Planning → Architecture → Developer ⇄ Tester (bounded repair loop) → DevOps.
+3. **Runtime** writes files and runs tests (simulated by default, real Docker in docker mode).
+4. **Observability** stores every event raw first, normalizes it to the FOAP canonical schema,
+   and shows the correlated trace, pipeline health, and failures.
+
+Use the preset buttons (*Pass first try*, *Repair ×2*, *Budget exhausted*, *Infeasible*,
+*Blank*) and the Plane 4 ingest buttons (*Rich event*, *Drifted fields*, *Malformed*, *Retry failed*).
+
+Terminal-only demonstration of the same five scenarios:
+
+```powershell
+uv run cloudeq-demo
+```
+
+### Execution modes
+
+| Mode | How | What is real |
+| --- | --- | --- |
+| `simulation` (default) | `uv run cloudeq-server` | Intake, supervisor, repair loop, telemetry pipeline. Runtime results are simulated and labeled so. |
+| `docker` | Start Docker Desktop, then `scripts\start-docker-mode.ps1` | Generated Python code and its pytest suite are written to a task workspace and tested in the locked-down sandbox container (no network, non-root, read-only mount). The "failing iterations" setting injects a defect so the container's real test failure drives the repair. Stage text comes from a deterministic template client, not an LLM. |
+| docker + live Gemini | docker mode plus `CLOUDEQ_AGENT_ENGINE=crewai`, `CLOUDEQ_GEMINI_LIVE_CALLS=true`, `GEMINI_API_KEY`, `GEMINI_AGENT_MODEL` | CrewAI + Gemini write the code. Paid API usage; never enabled by default. |
+
+### Full integration stack (Kafka, MongoDB, Grafana)
+
+```powershell
+docker compose up -d --build     # app :8000, Grafana :3000 (admin/admin), Kafka :9092, MongoDB :27017
+docker compose down              # keeps data volumes
+```
+
+In this stack telemetry goes app → Kafka → consumer → MongoDB (`raw_events`,
+`canonical_events`, `normalization_attempts`), and Grafana's provisioned
+"FORGE SPAN — cross-plane operations" dashboard reads `/observability/grafana/*`
+through the Infinity data source. To run the app on the host against those
+services instead: `uv sync --extra kafka --extra mongo` and set
+`CLOUDEQ_TELEMETRY_BUS=kafka`, `CLOUDEQ_OBSERVABILITY_STORE=mongodb` in `.env`.
+
+### Useful endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /` | Dashboard |
+| `POST /api/runs` `{prompt, dataset?, simulated_failures?}` | Run a prompt through all planes |
+| `GET /api/runs`, `GET /api/runs/{task_id}` | Run history (persisted to `~/.cloudeq/runs.jsonl`) |
+| `POST /tasks` | Plane 1 contract, now backed by the agents |
+| `GET /observability/traces/{trace_id}` | Raw + canonical events for one trace |
+| `GET /observability/metrics`, `/observability/health` | Pipeline metrics |
+| `POST /observability/ingest` | Schema-agnostic external event ingestion |
+| `POST /observability/retry?normalizer=offline` | Re-normalize failed events |
+| `GET /observability/grafana/*` | Flat tables for Grafana Infinity |
+
+`uv run cloudeq-observability stats|retry|consume|retention` covers the worker and maintenance side.
+
 ## Setup status
 
+All four planes and the integration layer are in place (see Quick start above).
+The notes below describe the individual plane CLIs, which still work on their own.
 Configuration, Plane 1 intake, the Plane 2 agent engine, and the Plane 3
 container runtime are in place. The API and CLI validate a prompt, route it
 with the offline feasibility adapter, and hand a feasible task to the default
@@ -211,8 +280,10 @@ Status is in `docs/implementation-status.md`.
 2. Plane 1, intake — offline API and CLI are implemented. Ticket adapters are not.
 3. Plane 2, agent orchestration — offline simulation is the default. A real stage client requires the container backend and explicit Gemini settings. Live kickoff was not called.
 4. Plane 3, sandboxed execution — `DockerRuntimeExecutor` is implemented. Unit tests inject the Docker runner. The live container smoke test runs only when the Docker engine is up.
-5. Plane 4, observability — next.
-6. Integration and demonstration.
+5. Plane 4, observability — implemented: redaction, raw-first dual retention,
+   offline + Gemini normalizers, SQLite/MongoDB stores, in-process/Kafka bus, read API.
+6. Integration and demonstration — implemented: `cloudeq-server` dashboard,
+   `cloudeq-demo`, Docker Compose stack, Grafana provisioning.
 
 ## GitHub and team contribution
 

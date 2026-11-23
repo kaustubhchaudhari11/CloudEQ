@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cloudeq"
-version = "0.1.0"
+version = "0.2.0"
 description = "FORGE SPAN by Cloud EQ: an autonomous multi-agent SDLC framework with federated observability."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -24,9 +24,20 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+[project.optional-dependencies]
+# Real FOAP integrations. The default install runs fully offline without them.
+kafka = ["confluent-kafka>=2.4"]
+mongo = ["pymongo>=4.7"]
+render = [
+    "render==1.10.0",
+]
+
 [project.scripts]
 cloudeq-intake = "cloudeq.plane1_intake.cli:main"
 cloudeq-agents = "cloudeq.plane2_agents.cli:main"
+cloudeq-server = "cloudeq.platform.server:main"
+cloudeq-demo = "cloudeq.platform.demo:main"
+cloudeq-observability = "cloudeq.plane4_observability.cli:main"
 
 [dependency-groups]
 dev = [
@@ -65,5 +76,5 @@ namespace_packages = false
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["crewai", "crewai.*"]
+module = ["crewai", "crewai.*", "confluent_kafka", "confluent_kafka.*", "pymongo", "pymongo.*"]
 ignore_missing_imports = true

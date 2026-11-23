@@ -1,0 +1,16 @@
+apiVersion: 1
+datasources:
+  - name: FORGE SPAN
+    uid: forge-span-api
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    url: http://${FORGE_API_HOSTPORT}
+    basicAuth: true
+    basicAuthUser: forge
+    secureJsonData:
+      basicAuthPassword: ${FORGE_API_PASSWORD}
+    jsonData:
+      allowedHosts:
+        - http://${FORGE_API_HOSTPORT}
+    isDefault: true
+    editable: false
