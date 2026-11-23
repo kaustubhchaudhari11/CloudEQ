@@ -3,13 +3,32 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 def main() -> int:
     if sys.platform != "linux" or not os.path.isdir("/tmp/forge-task"):
         raise RuntimeError("This harness runs only inside a prepared Linux sandbox.")
+    # Render's base image launches exec sessions as root. The trusted launcher
+    # drops that identity before loading any task file or starting pytest.
+    import ctypes
     import resource
 
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(38, 1, 0, 0, 0) != 0:  # PR_SET_NO_NEW_PRIVS
+        raise RuntimeError("Could not disable privilege escalation for generated tests.")
+    if os.geteuid() == 0:
+        # SDK uploads can arrive with owner-only modes. Allow the test identity
+        # to read/traverse the immutable task tree, without granting writes.
+        task = Path("/tmp/forge-task")
+        for entry in task.rglob("*"):
+            if entry.is_symlink():
+                raise RuntimeError("Uploaded task unexpectedly contains a symlink.")
+            entry.chmod(0o555 if entry.is_dir() else 0o444)
+        task.chmod(0o555)
+        os.setgroups([])
+        os.setgid(65534)
+        os.setuid(65534)
     if os.geteuid() == 0:
         raise RuntimeError("Generated tests must run as a non-root sandbox user.")
 
