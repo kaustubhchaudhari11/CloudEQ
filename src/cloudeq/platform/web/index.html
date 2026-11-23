@@ -102,6 +102,7 @@
         <button id="run">Run through all planes</button>
         <button class="ghost" id="refresh">Refresh</button>
       </div>
+      <div class="hint">Part 1 demonstration shortcuts (switches the workflow):</div>
       <div class="presets">
         <button class="ghost" data-p="Add a health check endpoint" data-f="0">Pass first try</button>
         <button class="ghost" data-p="Add input validation to the signup form" data-f="2">Repair ×2</button>
@@ -167,7 +168,7 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const PLANE_COLORS = {plane1_intake:"var(--p1)", plane2_agents:"var(--p2)", plane3_runtime:"var(--p3)", plane4_observability:"var(--p4)"};
-let current = null, config = null;
+let current = null, config = null, runBusy = false;
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
@@ -236,6 +237,7 @@ async function loadMetrics() {
 }
 
 async function openRun(id) {
+  if (runBusy) return;
   const {ok, body} = await api(`/api/runs/${encodeURIComponent(id)}`);
   if (ok) { await render(body); loadMetrics(); }
 }
@@ -250,14 +252,15 @@ async function render(rec) {
   $("detail-body").style.display = "";
   const intake = rec.intake || {}, agents = rec.agents, det = rec.details || {};
   $("ids").innerHTML = `task_id ${esc(rec.task_id || "—")} · trace_id ${esc(rec.trace_id)} · ${esc(rec.duration_ms)} ms`;
-  const feas = intake.feasibility ? `feasibility ${esc(intake.feasibility.status)} · router ${esc(intake.feasibility.router)}` : esc((intake.reasons||[]).join("; "));
+  const reasons = (intake.reasons || []).join("; ");
+  const feas = intake.feasibility ? `feasibility ${esc(intake.feasibility.status)} · router ${esc(intake.feasibility.router)}<br>${esc(reasons)}` : esc(reasons);
   const iters = agents ? agents.iterations.length : 0;
   $("flow").innerHTML = [
     planeCard("1 · Intake & trigger", "var(--p1)", badge(intake.status), feas),
     planeCard("2 · Agent orchestration", "var(--p2)", agents ? badge(agents.state) : "—",
-      agents ? `${esc(agents.engine)} · ${iters} iteration(s) · DevOps ${agents.devops_ran ? "ran" : "did not run"}` : "not handed off"),
+      agents ? `${esc(agents.engine)} · ${iters} iteration(s) · DevOps ${agents.devops_ran ? "ran" : "did not run"}` : "Not started: intake did not approve this request. See its reason."),
     planeCard("3 · Sandboxed runtime", "var(--p3)", agents ? `<span class="badge b-info">${esc(det.runtime_backend || "—")}</span>` : "—",
-      agents ? (det.runtime_error ? esc(det.runtime_error) : `${agents.execution_kind} · host execution: ${agents.host_execution}`) : "no execution"),
+      agents ? (det.runtime_error ? esc(det.runtime_error) : (iters ? `${agents.execution_kind} · host execution: ${agents.host_execution}` : "No test result recorded; see the agent error below.")) : "Not started because the task did not reach the agents."),
     planeCard("4 · Observability", "var(--p4)", `<span id="obs-badge">…</span>`, `<span id="obs-detail"></span>`),
   ].join("");
 
@@ -271,7 +274,7 @@ async function render(rec) {
 
   $("iters").innerHTML = agents && agents.iterations.length ? `<table><tr><th>#</th><th>Result</th><th>Developer artifact</th><th>Tester feedback</th></tr>${
     agents.iterations.map(i => `<tr><td class="mono">${i.iteration}</td><td>${badge(i.passed ? "passed" : "failed")}</td><td class="mono">${esc(i.diff_summary)}</td><td class="mono">${esc((i.tester_feedback||"").slice(-300))}</td></tr>`).join("")
-  }</table><div class="hint">${esc(agents.termination_reason)}</div>` : `<div class="empty">${agents ? esc(agents.termination_reason) : "The task was not handed to the agents."}</div>`;
+  }</table><div class="hint">${esc(agents.termination_reason)}</div>` : `<div class="empty">${agents ? esc(agents.termination_reason) : esc(reasons || "The task was not handed to the agents.")}</div>`;
 
   const files = det.generated_files || [];
   $("files").innerHTML = files.length ? files.map(f => `<div class="mono" style="font-size:12px;margin-top:6px">${esc(f.path)}</div><pre>${esc(f.content)}</pre>`).join("")
@@ -281,7 +284,7 @@ async function render(rec) {
   const evs = trace.events || [];
   const failed = evs.filter(e => e.raw.normalization_status === "failed").length;
   const pending = evs.filter(e => e.raw.normalization_status === "pending").length;
-  $("obs-badge").innerHTML = badge(failed ? "failed" : (pending ? "pending" : "normalized"));
+  $("obs-badge").innerHTML = badge(!evs.length ? "pending" : (failed ? "failed" : (pending ? "pending" : "normalized")));
   $("obs-detail").textContent = `${evs.length} raw · ${evs.filter(e => e.canonical).length} canonical · ${failed} failed`;
   $("telemetry").innerHTML = evs.length ? `
     <table><tr><th>Time</th><th>Plane</th><th>Event</th><th>Canonical job</th><th>Status</th><th>Normalization</th></tr>
@@ -298,17 +301,31 @@ async function render(rec) {
 }
 
 async function submit() {
+  if (runBusy) return;
+  runBusy = true;
   $("err").textContent = "";
   $("run").disabled = true; $("run").textContent = "Running…";
+  $("variant").disabled = true;
+  document.querySelectorAll(".presets button").forEach(b => b.disabled = true);
+  current = null;
+  $("detail-body").style.display = "none";
+  $("detail-empty").style.display = "";
+  $("detail-empty").textContent = "Processing this request. Live agents can take several minutes. Please wait for the result before submitting another task.";
   try {
-    const body = {prompt: $("prompt").value, simulated_failures: Number($("failures").value || 0), run_variant: $("variant").value};
+    const body = {prompt: $("prompt").value, simulated_failures: $("variant").value === "template" ? Number($("failures").value || 0) : 0, run_variant: $("variant").value};
     if ($("dataset").value.trim()) body.dataset = $("dataset").value.trim();
     const res = await api("/api/runs", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
     if (res.body && res.body.trace_id) await render(res.body);
     if (!res.ok) $("err").textContent = (res.body.reasons || res.body.intake?.reasons || ["Request rejected"]).join("; ");
     await loadMetrics();
   } catch (e) { $("err").textContent = String(e); }
-  finally { $("run").disabled = false; $("run").textContent = "Run through all planes"; }
+  finally {
+    runBusy = false; $("run").disabled = false; $("run").textContent = "Run through all planes";
+    $("variant").disabled = false;
+    document.querySelectorAll(".presets button").forEach(b => b.disabled = false);
+    updateVariant();
+    if (!current) $("detail-empty").textContent = "No run result was received. Check the message beside the form, refresh Recent runs, and retry only if no completed run appears.";
+  }
 }
 
 async function ext(payload) {
@@ -318,8 +335,13 @@ async function ext(payload) {
 }
 
 $("run").onclick = submit;
+function updateVariant() { $("failures").disabled = $("variant").value !== "template"; }
+$("variant").onchange = updateVariant;
+updateVariant();
 $("refresh").onclick = () => { loadMetrics(); if (current) openRun(current.task_id); };
 document.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
+  if (runBusy) return;
+  $("variant").value = "template"; updateVariant();
   $("prompt").value = b.dataset.p; $("failures").value = b.dataset.f; $("dataset").value = b.dataset.d || ""; submit();
 });
 $("ext-rich").onclick = () => ext({actor_id: "planner-agent", target_id: "coder-agent", event_type: "Handoff", action: "delegate", status: "success", latency_ms: 42, span_id: "sp-1", tool_name: "search", metadata: {tokens: 812}});

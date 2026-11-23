@@ -121,6 +121,13 @@ class GeminiRouter:
             return _error(model_id, "Gemini router timed out.")
         except GeminiCallError as exc:
             code = "unknown" if exc.status_code is None else str(exc.status_code)
+            if exc.status_code in {500, 502, 503, 504}:
+                return _error(
+                    model_id,
+                    f"Gemini feasibility check is temporarily unavailable (HTTP {code}) "
+                    "after bounded retries. Wait briefly and submit again. "
+                    "Agents and runtime were not started.",
+                )
             return _error(model_id, f"Gemini router failed with status {code}.")
         parsed = _parse_model_json(raw, model_id=model_id)
         if parsed is None:
