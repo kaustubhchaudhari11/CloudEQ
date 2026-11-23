@@ -15,6 +15,7 @@ from urllib.parse import quote
 from pydantic import ValidationError
 
 from cloudeq.plane4_observability.records import CanonicalEvent, EntityRef, RawRecord
+from cloudeq.shared.http_retry import post_json_with_retry
 
 
 class NormalizationError(Exception):
@@ -330,12 +331,14 @@ def gemini_http_generate(*, api_base: str, api_key: str, timeout_seconds: float)
             "contents": [{"role": "user", "parts": [{"text": user_text}]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
-        response = httpx.post(
-            url,
-            headers={"x-goog-api-key": api_key, "content-type": "application/json"},
-            json=body,
-            timeout=timeout_seconds,
-        )
+        with httpx.Client() as client:
+            response = post_json_with_retry(
+                client,
+                url,
+                headers={"x-goog-api-key": api_key, "content-type": "application/json"},
+                body=body,
+                timeout_seconds=timeout_seconds,
+            )
         response.raise_for_status()
         payload = response.json()
         parts = payload["candidates"][0]["content"]["parts"]

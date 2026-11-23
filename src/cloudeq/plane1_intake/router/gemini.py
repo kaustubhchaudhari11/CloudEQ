@@ -17,6 +17,7 @@ from cloudeq.shared.contracts.models import (
     RouterKind,
     RoutingRequest,
 )
+from cloudeq.shared.http_retry import post_json_with_retry
 from cloudeq.shared.ports.protocols import GeminiTransport
 
 _MODEL_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
@@ -62,11 +63,12 @@ class HttpxGeminiTransport:
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
         try:
-            response = self._http().post(
+            response = post_json_with_retry(
+                self._http(),
                 url,
                 headers={"x-goog-api-key": api_key, "content-type": "application/json"},
-                json=body,
-                timeout=self._timeout,
+                body=body,
+                timeout_seconds=self._timeout,
             )
         except httpx.TimeoutException as exc:
             raise GeminiTimeout("Gemini router timed out") from exc
