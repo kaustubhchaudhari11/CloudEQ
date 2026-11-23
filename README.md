@@ -1,223 +1,213 @@
 # FORGE SPAN
 
-**An Autonomous Multi-Agent SDLC Framework with Federated Observability**
-By **Cloud EQ**.
+**An autonomous multi-agent SDLC framework with federated observability**
+Team: **Cloud EQ**. Repository/package identifiers remain `CloudEQ` / `cloudeq`.
 
-Cloud EQ is the team. FORGE SPAN is the product. The technical identifier remains
-`CloudEQ`: the GitHub repository, the `cloudeq` package, and the `CLOUDEQ_`
-environment prefix. See `docs/PROJECT_IDENTITY.md`.
+## Submission source and status
 
-Grok is the coding assistant in Cursor. Gemini is the application's runtime model
-provider. This project does not replace Gemini with Grok.
+The complete Drive project plus our deployment fixes is on **`deploy/render-full-stack`**. Use the branch-specific clone command below. At the November 23 check, `main` still contained the older Plane 3 milestone. See [source provenance](docs/SOURCE_PROVENANCE.md) for the comparison.
 
-## Setup status
+All four planes and the integrated dashboard are implemented:
 
-Configuration, Plane 1 intake, the Plane 2 agent engine, and the Plane 3
-container runtime are in place. The API and CLI validate a prompt, route it
-with the offline feasibility adapter, and hand a feasible task to the default
-in-memory port. That default handoff does not run the supervisor.
-`cloudeq-agents run` runs a labeled offline simulation of the six SDLC stages
-and the Developer–Tester loop. It does not call CrewAI, Gemini, Docker, Kafka,
-or MongoDB. Plane 4 is not implemented. Live Gemini calls stay disabled.
+1. **Intake:** validate a prompt, check feasibility, and hand it to the agents.
+2. **Agents:** Requirements, Planning, Architecture, Development, Testing, and DevOps. Development and Testing repeat within a repair budget; DevOps follows an actual pass.
+3. **Runtime:** test generated Python code in a restricted Docker container locally or an isolated Render environment when hosted.
+4. **Observability:** retain accepted raw events before normalization, store canonical records separately, and correlate events by task/event/trace IDs. SQLite is the local default; Kafka, MongoDB, and Grafana are optional integrations.
 
-Open this folder in Cursor, or open `FORGE-SPAN.code-workspace`. The always-applied
-rule is `.cursor/rules/cloudeq.mdc`. `.cursorrules` carries the same guidance.
-Keep their rule bodies synchronized.
+Hosted demo: <https://forge-span.onrender.com>. Local evaluation requires no Render or AWS account. Simulation, deterministic template runs, and live Gemini runs are labeled separately. One complete hosted live Gemini health-check workflow passed real tests; other live requests encountered Gemini 503 errors. See [verification](docs/DEPLOYMENT_VERIFICATION.md).
 
-The next session is Plane 4, observability, in `docs/CURSOR_BUILD_PROMPT.md`.
-Plane 1's prompt remains `docs/CURSOR_START_PROMPT.md`.
+## 1. Technical requirements
 
-## Workspace structure
+- Git, or download and extract the ZIP of the source branch above.
+- Python **3.12** recommended. The package supports `>=3.12,<3.14`.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for locked dependencies and the project-local environment. Submission checks used Windows and uv 0.13.2.
+- A modern browser; the local application uses port **8000**.
+- For actual generated-code execution: Docker Desktop with Linux containers on Windows/macOS, or Docker Engine on Linux. The engine must be running.
+- For live Part 2: a Gemini API key, an explicit model ID available to that key, internet access, and sufficient provider quota. No key is needed for the offline demonstration.
+- Suggested capacity: 8 GB RAM and 10 GB free disk for the full demonstration, not a measured minimum. Test containers default to one CPU, 512 MB RAM, and a 120-second timeout.
+
+`pyproject.toml` lists application/development dependencies, and `uv.lock` pins resolved versions. Core packages include FastAPI, CrewAI with Google GenAI, Uvicorn, httpx, Pydantic Settings, and PyYAML. Optional extras are `kafka`, `mongo`, and `render`. The local runtime image contains pytest 9.2.0 and Flask 3.1.3.
+
+## 2. Download and install
+
+The repository is private until the team changes its visibility; private access requires an invitation and your own GitHub account. No team credentials are included.
 
 ```text
-.
-|-- FORGE-SPAN.code-workspace
-|-- CloudEQ.code-workspace
-|-- pyproject.toml
-|-- uv.lock
-|-- .python-version
-|-- .cursor/rules/cloudeq.mdc
-|-- .cursorrules
-|-- .gitignore
-|-- .env.example
-|-- README.md
-|-- CONTRIBUTING.md
-|-- docs/
-|   |-- requirements.md
-|   |-- implementation-status.md
-|   |-- PROJECT_IDENTITY.md
-|   |-- CURSOR_CONFIGURE_PROMPT.md
-|   |-- CURSOR_START_PROMPT.md
-|   |-- CURSOR_BUILD_PROMPT.md
-|   |-- architecture/
-|   |   |-- overview.md
-|   |   |-- decisions.md
-|   |   `-- contracts.md
-|   `-- references/
-|-- src/cloudeq/
-|   |-- shared/
-|   |   |-- contracts/
-|   |   `-- ports/
-|   |-- plane1_intake/
-|   |-- plane2_agents/
-|   |-- plane3_runtime/
-|   `-- plane4_observability/
-|-- infra/
-|-- tests/
-`-- scripts/
+git clone --branch deploy/render-full-stack --single-branch https://github.com/kaustubhchaudhari11/CloudEQ.git FORGE-SPAN
+cd FORGE-SPAN
+uv python install 3.12
+uv sync --locked --python 3.12
 ```
 
-Plane 1, Plane 2, and Plane 3 contain application code. Plane 4 is still a
-package marker. `.env.example` has empty secrets and offline defaults. Do not
-commit `.env`.
+For a ZIP, select `deploy/render-full-stack` on GitHub before **Code → Download ZIP**. Extract it, open a terminal in the directory containing `pyproject.toml`, then run the two `uv` commands. No developer-specific absolute path is needed.
 
-## References in Cursor
+Create `.env` once from the supplied template. Do not replace an existing file.
 
-Add these files to chat context before an implementation session:
-
-- `docs/references/CloudEQ.extracted.md`
-- `docs/references/FOAP-paper.extracted.md`
-- `docs/references/FORGE-SPAN-architecture.md`
-- `docs/references/FORGE-SPAN-architecture.jpg`
-- the prompt for that session (`docs/CURSOR_START_PROMPT.md` for Plane 1)
-
-Keep the original PDFs beside the extracts. The PDFs are authoritative. Extracts
-are page-marked text, and figures may be missing from them. No assignment rubric
-has been supplied. Never attach `.env` or API credentials.
-
-![FORGE SPAN architecture supplied by the team](docs/references/FORGE-SPAN-architecture.jpg)
-
-Read `docs/references/README.md` before treating a sentence as a requirement.
-`docs/requirements.md` records page references and planned checks.
-`docs/architecture/contracts.md` records plane boundaries. The diagram's Git
-commit box does not authorize a host commit or a push.
-
-## Windows PowerShell setup
-
-Run these commands from the repository root. The root must be this folder, not
-`C:\Users\kaust\projects`.
+Windows PowerShell:
 
 ```powershell
-Set-Location C:\Users\kaust\projects\CloudEQ
-git rev-parse --show-toplevel
-py -3.12 --version
-uv --version
-uv sync
-uv lock --check
-uv run python -c "import cloudeq.plane1_intake, cloudeq.plane2_agents, cloudeq.plane3_runtime, cloudeq.plane4_observability, cloudeq.shared.contracts, cloudeq.shared.ports; print('imports-ok')"
-uv run ruff check src tests
-uv run ruff format --check src tests
-uv run mypy
-uv run pytest
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-`uv sync` creates `.venv` in this folder and installs the package, FastAPI,
-Uvicorn, httpx, PyYAML, CrewAI 1.15.34 with the Gemini extra, pytest, Ruff,
-and mypy. It does not install a Kafka client, MongoDB, the Docker engine, or
-Grafana, and it does not call Gemini. Plane 3 unit tests inject a command
-runner, so they pass while Docker Desktop is stopped.
+macOS/Linux:
 
-Expected results on this machine:
-
-- `git rev-parse --show-toplevel` prints `C:/Users/kaust/projects/CloudEQ`.
-- Python is 3.12.x and below 3.14. This machine used 3.12.2.
-- `imports-ok` prints after the import command.
-- Ruff and mypy exit 0.
-- `uv run pytest` exits 0. On 2026-11-03 the result was `74 passed, 1 skipped`.
-  The skip is the live container smoke test when `docker info` cannot reach
-  the engine. A passing test is not evidence that CrewAI, Gemini, Kafka,
-  MongoDB, or Grafana ran.
-
-If `uv` is missing, install it from [Astral's uv documentation](https://docs.astral.sh/uv/getting-started/installation/) and open a new shell. If `py -3.12` fails, install CPython 3.12. The project rejects 3.14 because current CrewAI does not support it. Library versions and that constraint are in `docs/architecture/decisions.md`.
-
-Copy `.env.example` to `.env` only for local settings. Leave secrets empty and
-leave `CLOUDEQ_GEMINI_LIVE_CALLS=false` until a model ID is chosen deliberately.
-The HTTP shapes are in `docs/plane1-http.md`.
-
-## Offline Plane 1 demo
-
-Run this from the repository root. It does not call Gemini.
-
-```powershell
-Set-Location C:\Users\kaust\projects\CloudEQ
-$env:CLOUDEQ_ROUTER_MODE = "offline"
-$env:CLOUDEQ_GEMINI_LIVE_CALLS = "false"
-$env:GEMINI_API_KEY = ""
-$env:GEMINI_ROUTER_MODEL = ""
-uv run cloudeq-intake submit --prompt "Add a health check"
-uv run uvicorn cloudeq.plane1_intake.api.app:app --host 127.0.0.1 --port 8000
+```sh
+test -e .env || cp .env.example .env
 ```
 
-In a second shell, with the server still running:
+The template contains offline defaults and empty secrets. The app loads `.env` from the current working directory; existing process environment variables take precedence. Restart the server after changes. Never commit `.env`, passwords, or keys.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-$body = @{ source = "api"; prompt = "Add a health check" } | ConvertTo-Json
-Invoke-RestMethod http://127.0.0.1:8000/tasks -Method Post -ContentType "application/json" -Body $body
+## 3. First check: no key or Docker required
+
+Keep the copied `.env` defaults and run:
+
+```text
+uv run --locked cloudeq-server
 ```
 
-`status` `handed_off` and `execution_started` `$false` mean the default in-memory
-port accepted the contract. They do not mean the supervisor ran or that code was
-generated. Stop the server with Ctrl+C.
-A blank prompt exits the CLI with code 2. A named dataset is routed as infeasible:
+Open <http://127.0.0.1:8000>. Select **Part 1: template workflow and repair demonstration** and submit `Add a health check`. In `simulation` execution mode, the workflow and telemetry are real application behavior but test outcomes are simulated. Expect `simulation=true`, `live_gemini=false`, and `host_execution=false`.
 
-```powershell
-uv run cloudeq-intake submit --prompt "Use the corpus" --dataset "corpus-v1"
+The repair budget defaults to three attempts. **Repair ×2** fails twice and passes on the third attempt. **Budget exhausted** fails all three and skips DevOps. **Blank (rejected)** demonstrates validation. **Infeasible** uses an unknown dataset; there is no dataset catalog.
+
+Terminal-only demonstration of these five scenarios:
+
+```text
+uv run --locked cloudeq-demo
 ```
 
-## Offline Plane 2 demo
+Stop the web server with **Ctrl+C** before changing modes.
 
-This command runs the labeled simulation. `simulation` is true, `live_crewai`
-and `live_gemini` are false, and `host_execution` is false. A pass runs DevOps
-only after the simulated test result. It does not prove live CrewAI or Gemini
-execution, and it does not execute generated code.
+## 4. Part 1 with actual local tests
 
-```powershell
-Set-Location C:\Users\kaust\projects\CloudEQ
-$env:CLOUDEQ_AGENT_ENGINE = "offline"
-$env:CLOUDEQ_REPAIR_MAX_ITERATIONS = "3"
-uv run cloudeq-agents run --prompt "Add a health check"
-```
+Start the Docker engine in Linux container mode. From the repository root:
 
-Exit 0 is `passed` for the offline simulation. Exit 2 is `failed_budget_exhausted`.
-Exit 3 is `cancelled`. Exit 1 is `error`. `--engine crewai` with the default
-settings is a configuration error. The CLI does not construct a live stage
-client, so a key and model id still leave kickoff uncalled.
-
-## Plane 3 container image
-
-The sandbox image is `cloudeq-runtime:py3.12-pytest9.2.0`. Its base is
-`python:3.12-slim`, and `infra/runtime/Dockerfile` adds pytest 9.2.0 because
-the only allowlisted test command is `python -m pytest`. Build it when Docker
-Desktop is running:
-
-```powershell
-Set-Location C:\Users\kaust\projects\CloudEQ
+```text
+docker info
 docker build -t cloudeq-runtime:py3.12-pytest9.2.0 infra/runtime
-uv run pytest tests/plane3/test_smoke.py
 ```
 
-The smoke test writes a fixed `tests/test_health.py` fixture and runs it in
-one container. It does not call Gemini. If `docker info` cannot reach the
-engine, pytest skips that test. The default `cloudeq-agents` command stays on
-the offline simulation. A fake stage client can be composed with
-`DockerRuntimeExecutor` through `src/cloudeq/composition.py`. An injected Docker runner is labeled `container-mock` with `simulation=true`; only the real Docker CLI runner is labeled `container`. The task workspace defaults to `~/.cloudeq/runtime_workspaces`, outside the repository.
+Edit these existing `.env` lines:
 
-## Roadmap
+```dotenv
+CLOUDEQ_EXECUTION_MODE=docker
+CLOUDEQ_AGENT_ENGINE=offline
+CLOUDEQ_GEMINI_LIVE_CALLS=false
+CLOUDEQ_ROUTER_MODE=offline
+CLOUDEQ_NORMALIZER_MODE=offline
+```
 
-Status is in `docs/implementation-status.md`.
+Restart `uv run --locked cloudeq-server`, select **Part 1**, and choose **Repair ×2**. The stage content is deterministic, but pytest executes in real containers. Expect runtime `container`, `simulation=false`, two failing iterations followed by a pass, and DevOps after the pass. `live_gemini=false` is expected.
 
-1. Configuration — done.
-2. Plane 1, intake — offline API and CLI are implemented. Ticket adapters are not.
-3. Plane 2, agent orchestration — offline simulation is the default. A real stage client requires the container backend and explicit Gemini settings. Live kickoff was not called.
-4. Plane 3, sandboxed execution — `DockerRuntimeExecutor` is implemented. Unit tests inject the Docker runner. The live container smoke test runs only when the Docker engine is up.
-5. Plane 4, observability — next.
-6. Integration and demonstration.
+Containers have no network, no application keys, a non-root user, a read-only task mount, and resource/time limits. `host_execution=false` is correct: generated code did not run directly on the application host.
 
-## GitHub and team contribution
+## 5. Part 2: live CrewAI and Gemini locally
 
-The private repository is [kaustubhchaudhari11/CloudEQ](https://github.com/kaustubhchaudhari11/CloudEQ).
-Plane 3 work is on `feature/plane3-runtime` and is not pushed by this session. It is independent of any repository in the parent directory. See
-`CONTRIBUTING.md`. A pull-request template is under `.github/`.
+Complete section 4 first. Obtain your own key through [Google AI Studio](https://aistudio.google.com/apikey), following [Google's key setup instructions](https://aistudio.google.com/docs/api-key). Usage may require quota or billing. Keep the key only in your local configuration.
 
-Do not rename the GitHub repository to match the product name.
+Edit these `.env` values:
+
+```dotenv
+CLOUDEQ_EXECUTION_MODE=docker
+CLOUDEQ_AGENT_ENGINE=crewai
+CLOUDEQ_GEMINI_LIVE_CALLS=true
+GEMINI_API_KEY=REPLACE_LOCALLY_WITH_YOUR_OWN_KEY
+GEMINI_AGENT_MODEL=gemini-3.5-flash-lite
+CLOUDEQ_GEMINI_TIMEOUT_SECONDS=60
+CLOUDEQ_ROUTER_MODE=offline
+CLOUDEQ_NORMALIZER_MODE=offline
+```
+
+The key value above is a placeholder. `gemini-3.5-flash-lite` was used in the verified hosted run on November 23, 2026; model availability depends on the provider and your account. Choose an available compatible Gemini model explicitly if needed. No model ID is silently guessed.
+
+Keeping routing and normalization offline initially isolates the six live agent stages and reduces unrelated API calls. To use Gemini in those two planes as well, set `CLOUDEQ_ROUTER_MODE=gemini`, `CLOUDEQ_NORMALIZER_MODE=gemini`, and fill `GEMINI_ROUTER_MODEL` and `GEMINI_NORMALIZER_MODEL` with available model IDs.
+
+Restart `uv run --locked cloudeq-server`. Confirm the dashboard says **CrewAI + Gemini (live)**, select **Part 2: configured agents**, and submit:
+
+```text
+Write health.py with a health_check() function returning exactly {"status":"ok"}, and test_health.py with pytest tests for that function. Use only Python standard library and pytest; compatible with Python 3.11 or later. Include both files in the Development output. Testing must request exactly python -m pytest. No networking, installs, subprocesses, or external packages.
+```
+
+Allow time for sequential model stages and container tests. A successful live run must show:
+
+- Agent outcome `passed`, with all six stages and DevOps.
+- `live_crewai=true`, `live_gemini=true`, and `simulation=false`.
+- A real runtime test result with exit code zero; model text alone is insufficient.
+- Generated files and telemetry linked to the same task and trace.
+- `host_execution=false`, because tests ran inside the isolated environment.
+
+**Part 1 presets switch the workflow to Part 1.** They do not test Gemini or force it to generate a bug. A missing live configuration can select the template client; check the labels and flags. Use `cloudeq-server` for the integrated live workflow. The earlier `cloudeq-agents` CLI is an offline/boundary demonstration.
+
+## 6. Observability and optional service stack
+
+Local defaults use an in-process event bus and SQLite, with no extra service. The **Rich event**, **Drifted fields**, and **Malformed** ingest examples demonstrate successful normalization and preserved raw data on normalization failure. **Retry failed** processes retained failures again. Trace IDs connect activity across the planes.
+
+To run Kafka, MongoDB, and Grafana locally, stop any host server on port 8000, then run:
+
+```text
+docker compose up -d --build
+docker compose ps
+```
+
+The Compose dashboard uses port 8000; Grafana uses 3000 (`admin` / `admin` for the first local login); Kafka uses 9092 and MongoDB 27017. These are local demonstration settings. Grafana reads the application HTTP API and never receives `MONGODB_URI`.
+
+**The Compose app uses simulation and offline models.** It has no Docker socket and cannot launch nested test containers. For actual local execution, run the host application as in sections 4–5. To combine that host application with Kafka/MongoDB:
+
+```text
+docker compose up -d kafka mongo
+uv sync --locked --extra kafka --extra mongo
+```
+
+Set `CLOUDEQ_TELEMETRY_BUS=kafka`, `CLOUDEQ_OBSERVABILITY_STORE=mongodb`, `KAFKA_BOOTSTRAP_SERVERS=localhost:9092`, and `MONGODB_URI=mongodb://localhost:27017` in `.env`, then restart the host application. The supplied Grafana datasource targets the Compose app, not this host process.
+
+`docker compose down` stops the optional stack and retains its data volumes. Blank `FOAP_RAW_RETENTION_DAYS` and `FOAP_CANONICAL_RETENTION_DAYS` mean deletion is not enabled.
+
+## 7. Verification
+
+From the repository root, with safe default settings:
+
+```text
+uv sync --locked --all-extras
+uv lock --check
+uv run --locked --all-extras ruff check src tests
+uv run --locked --all-extras ruff format --check src tests
+uv run --locked --all-extras mypy
+uv run --locked --all-extras pytest -q
+```
+
+`--all-extras` installs the optional integration client libraries so type-checking
+can inspect their imports. It does not start Kafka, MongoDB, or Render services.
+
+Unit/integration tests use offline adapters and test doubles; no Gemini key is required. The real Docker smoke test skips if the engine is unavailable. With Docker running, check it explicitly:
+
+```text
+uv run --locked pytest tests/plane3/test_smoke.py -q
+```
+
+See [dated verification results](docs/DEPLOYMENT_VERIFICATION.md). A skipped check is not a container pass. Local Docker and Compose were not rerun during the November 23 submission check because the local engine was stopped; hosted remote execution was checked separately.
+
+## Troubleshooting and practical limits
+
+- **Gemini 503:** temporary provider unavailability. Bounded retries are built in; wait before retrying. More hosting capacity does not resolve this.
+- **429 / 401 / 403 / 404:** check quota, local key configuration, account permissions, and model availability. Do not disclose the key.
+- **No handoff:** inspect the intake rejection/feasibility reason first.
+- **No actual execution:** check `docker info`, the built image, the mode, and the runtime error. Keep the task workspace outside the repository.
+- **Missing Flask:** rebuild `infra/runtime/Dockerfile`; it includes Flask. Arbitrary generated package-install commands are not supported.
+- **Port occupied:** stop the other server or use `cloudeq-server --port 8001`.
+- **Old settings:** process environment values override `.env`; use a fresh terminal and restart the server after edits.
+- Generated projects are reviewable files and test results, not automatically published websites. Generated Git commit/push operations are disabled.
+- Ticket adapters and a dataset catalog are not implemented. Retention deletion is not configured. Historical normalization failures remain visible and are not counted as successes.
+
+Default data locations are `~/.cloudeq/runs.jsonl`, `~/.cloudeq/observability.sqlite3`, and `~/.cloudeq/runtime_workspaces`. These can be changed through the variables in `.env.example`.
+
+## Source map and documentation
+
+- `src/cloudeq/plane1_intake/` — validation, intake API/CLI, routing.
+- `src/cloudeq/plane2_agents/` — roles, supervisor, repair loop, model clients.
+- `src/cloudeq/plane3_runtime/` — local Docker and hosted runtime.
+- `src/cloudeq/plane4_observability/` — bus, storage, normalization, read API.
+- `src/cloudeq/platform/` — integrated dashboard; `shared/` — contracts/interfaces.
+- `tests/` — automated checks; `infra/` — images and service configuration.
+- [References](docs/references/README.md), [architecture contracts](docs/architecture/contracts.md), [requirements](docs/requirements.md), and [project identity](docs/PROJECT_IDENTITY.md).
+- [Cloud demonstration](docs/CLOUD_DEMO.md) and [Render deployment](docs/RENDER_DEPLOYMENT.md).
+
+Submit the complete source branch and ensure the evaluator can access it. Do not submit only the hosted URL or include your real `.env` file.

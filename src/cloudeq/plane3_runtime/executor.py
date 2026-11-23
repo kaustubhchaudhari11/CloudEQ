@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from cloudeq.plane3_runtime.policy import allowlisted_argv, spec_from_settings
+from cloudeq.plane3_runtime.render_runner import RenderSandboxRunner
 from cloudeq.plane3_runtime.runner import DockerRunner, SubprocessDockerRunner
 from cloudeq.plane3_runtime.settings import RuntimeSettings
 from cloudeq.plane3_runtime.workspace import (
@@ -56,9 +57,18 @@ class DockerRuntimeExecutor:
         self.execution_backend = (
             "container" if type(runner) is SubprocessDockerRunner else "container-mock"
         )
+        if type(runner) is RenderSandboxRunner:
+            self.execution_backend = "render-sandbox" if runner.is_live else "render-sandbox-mock"
         self._sink = sink
         self._root = prepare_workspace_root(root)
         self._created: dict[str, str] = {}
+        self._artifacts: dict[str, dict[str, str]] = {}
+
+    def files_for(self, task_id: str) -> list[dict[str, str]]:
+        return [
+            {"path": path, "content": content}
+            for path, content in self._artifacts.get(task_id, {}).items()
+        ]
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
         started = time.perf_counter()
@@ -129,6 +139,7 @@ class DockerRuntimeExecutor:
             if not target.resolve().is_relative_to(workspace.resolve()):
                 raise RuntimeExecutionError("Runtime path escaped the task workspace.")
             written.append(item.relative_path)
+            self._artifacts.setdefault(request.task_id, {})[item.relative_path] = item.content
         return self._result(
             request,
             exit_code=0,
@@ -211,7 +222,7 @@ class DockerRuntimeExecutor:
             stderr=stderr,
             duration_ms=duration_ms,
             artifact_refs=artifact_refs,
-            simulation=self.execution_backend != "container",
+            simulation=self.execution_backend not in {"container", "render-sandbox"},
             host_execution=False,
         )
 

@@ -345,6 +345,8 @@ class Supervisor:
         live_crewai: bool = False,
         live_gemini: bool = False,
     ) -> AgentRunResult:
+        live_crewai = live_crewai or bool(getattr(self.crew_client, "live_crewai", False))
+        live_gemini = live_gemini or bool(getattr(self.crew_client, "live_gemini", False))
         result = AgentRunResult(
             task_id=handoff.task_id,
             trace_id=handoff.trace_id,

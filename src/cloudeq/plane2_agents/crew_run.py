@@ -59,7 +59,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             "crewai-execution-unavailable",
         )
     if client.uses_live_provider:
-        if backend != "container":
+        if backend not in {"container", "render-sandbox"}:
             return _error(
                 supervisor,
                 handoff,
@@ -71,7 +71,13 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             require_live_gemini(supervisor.settings)
         except CrewConfigurationError as exc:
             return _error(supervisor, handoff, exc.reason, "crewai-configuration-error")
-    elif backend not in {"mock", "container", "container-mock"}:
+    elif backend not in {
+        "mock",
+        "container",
+        "container-mock",
+        "render-sandbox",
+        "render-sandbox-mock",
+    }:
         return _error(
             supervisor,
             handoff,
@@ -81,6 +87,8 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
         )
     run_engine = "crewai-container" if backend == "container" else "crewai-mocked"
     run_kind = "container" if backend == "container" else "mocked"
+    if backend == "render-sandbox":
+        run_engine, run_kind = "crewai-render-sandbox", "render-sandbox"
 
     stages: list[StageOutput] = []
     try:
@@ -136,7 +144,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                 write,
                 handoff=handoff,
                 operation=RuntimeOperation.WRITE_FILE,
-                expect_simulation=backend == "container-mock",
+                expect_simulation=backend in {"container-mock", "render-sandbox-mock"},
             )
             if problem is not None:
                 raise RuntimeExecutionError(problem)
@@ -154,7 +162,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
                 tested,
                 handoff=handoff,
                 operation=RuntimeOperation.RUN_TESTS,
-                expect_simulation=backend == "container-mock",
+                expect_simulation=backend in {"container-mock", "render-sandbox-mock"},
             )
             if problem is not None:
                 raise RuntimeExecutionError(problem)
@@ -282,7 +290,7 @@ def run_crew(supervisor: Any, handoff: HandoffRequest, team: AgentTeam) -> Agent
             iterations=iterations,
             devops_ran=devops_ran,
             reason=reason,
-            simulation=backend == "container-mock",
+            simulation=backend in {"container-mock", "render-sandbox-mock"},
             engine=run_engine,
             execution_kind=run_kind,
         )
@@ -347,6 +355,8 @@ def _error(
         kind = "mocked"
     elif engine == "crewai-container":
         kind = "container"
+    elif engine == "crewai-render-sandbox":
+        kind = "render-sandbox"
     return _as_result(
         supervisor._finish(
             handoff,

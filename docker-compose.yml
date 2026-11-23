@@ -1,0 +1,98 @@
+# FORGE SPAN local integration stack.
+#   Start:  docker compose up -d --build
+#   Open:   http://localhost:8000  (FORGE SPAN dashboard)
+#           http://localhost:3000  (Grafana, admin / admin on first login)
+#   Stop:   docker compose down          (volumes are kept; do not add -v)
+#
+# app -> Kafka topic cloudeq.telemetry.raw -> consumer -> MongoDB raw + canonical
+# Grafana reads the app's HTTP read API through the Infinity data source; it is
+# never given the MongoDB URI.
+
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092,INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    image: forge-span-app:local
+    ports:
+      - "8000:8000"
+    environment:
+      CLOUDEQ_EXECUTION_MODE: simulation
+      CLOUDEQ_TELEMETRY_BUS: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TELEMETRY_TOPIC: cloudeq.telemetry.raw
+      KAFKA_CONSUMER_GROUP: cloudeq.observability
+      CLOUDEQ_OBSERVABILITY_STORE: mongodb
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DATABASE: cloudeq
+      CLOUDEQ_ROUTER_MODE: offline
+      CLOUDEQ_NORMALIZER_MODE: offline
+      CLOUDEQ_GEMINI_LIVE_CALLS: "false"
+    volumes:
+      - app-data:/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana-oss:11.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_INSTALL_PLUGINS: yesoreyeram-infinity-datasource
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  kafka-data:
+  mongo-data:
+  grafana-data:
+  app-data:

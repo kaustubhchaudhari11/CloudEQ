@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FORGE SPAN · Cloud EQ</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    --bg:#0f1216; --panel:#161b21; --panel2:#1c232b; --line:#2a333d; --ink:#e6eaef; --mute:#93a0ae;
+    --accent:#f0a33a; --ok:#3fb68b; --fail:#e5534b; --warn:#d8a13a; --info:#5aa7e6; --p1:#5aa7e6; --p2:#b48ef0; --p3:#f0a33a; --p4:#3fb68b;
+    --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+  header{display:flex;align-items:center;gap:18px;padding:14px 24px;border-bottom:1px solid var(--line);background:#11161b;position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-size:18px;letter-spacing:.14em}
+  .brand span{color:var(--mute);font-size:12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .chip{font:12px var(--mono);padding:3px 8px;border:1px solid var(--line);border-radius:4px;color:var(--mute)}
+  .chip i{font-style:normal;color:var(--ink)}
+  main{display:grid;grid-template-columns:360px 1fr;gap:18px;padding:18px 24px;max-width:1500px;margin:0 auto}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+  h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 12px;font-weight:600}
+  label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+  textarea,input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:8px 10px;font:14px var(--sans)}
+  textarea{min-height:84px;resize:vertical}
+  button{background:var(--accent);color:#1a1205;border:0;border-radius:6px;padding:9px 14px;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+  button:disabled{opacity:.5;cursor:wait}
+  .row{display:flex;gap:8px;align-items:center}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .presets button{font-size:12px;padding:5px 8px}
+  .hint{color:var(--mute);font-size:12px;margin-top:6px}
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .kpi .v{font:600 24px var(--mono)}
+  .kpi .l{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .plane{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:6px;padding:10px 12px;background:var(--panel2);min-height:86px}
+  .plane .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  .plane .s{font:600 15px var(--mono);margin:4px 0}
+  .plane .d{font-size:12px;color:var(--mute)}
+  .badge{display:inline-block;font:600 11px var(--mono);padding:2px 7px;border-radius:4px;text-transform:uppercase}
+  .b-ok{background:rgba(63,182,139,.15);color:var(--ok)} .b-fail{background:rgba(229,83,75,.15);color:var(--fail)}
+  .b-warn{background:rgba(216,161,58,.15);color:var(--warn)} .b-info{background:rgba(90,167,230,.15);color:var(--info)}
+  .stages{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:6px 0 14px}
+  .stage{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:12px}
+  .stage b{display:block;font-size:12px;margin-bottom:4px}
+  .stage.off{opacity:.35}
+  .stage p{margin:0;color:var(--mute);max-height:96px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--mute);font-weight:600;border-bottom:1px solid var(--line);padding:6px}
+  td{border-bottom:1px solid #222a33;padding:6px;vertical-align:top}
+  td.mono, .mono{font-family:var(--mono)}
+  tr.click{cursor:pointer} tr.click:hover{background:#1e252e}
+  pre{background:#0b0e12;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font:12px/1.45 var(--mono);max-height:340px;margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .stack{display:flex;flex-direction:column;gap:18px}
+  .bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px}
+  .bar .n{width:150px;color:var(--mute);font-family:var(--mono)}
+  .bar .track{flex:1;background:var(--panel2);border-radius:3px;height:12px;overflow:hidden}
+  .bar .fill{height:100%;background:var(--c,var(--accent))}
+  .bar .c{width:44px;text-align:right;font-family:var(--mono)}
+  .empty{color:var(--mute);padding:18px;text-align:center;border:1px dashed var(--line);border-radius:6px}
+  .tabs{display:flex;gap:4px;margin-bottom:8px}
+  .tabs button{background:transparent;color:var(--mute);border:1px solid var(--line);padding:5px 10px;font-weight:500;font-size:12px}
+  .tabs button.on{color:var(--ink);border-color:var(--accent)}
+  .err{color:var(--fail);font-size:12px;margin-top:8px}
+  .runs .r{padding:8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+  .runs .r:hover{background:var(--panel2)} .runs .r.on{border-color:var(--accent)}
+  .runs .p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .runs .m{font:11px var(--mono);color:var(--mute)}
+  @media (max-width:1100px){main{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}.stages{grid-template-columns:repeat(3,1fr)}.flow{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>FORGE&nbsp;SPAN</b><span>Autonomous multi-agent SDLC with federated observability · Cloud EQ</span></div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<main>
+  <div class="stack">
+    <section>
+      <h2>Submit a task</h2>
+      <label for="variant">Workflow</label>
+      <select id="variant" style="width:100%;padding:10px;margin-bottom:10px">
+        <option value="configured">Part 2: configured agents (live Gemini when enabled)</option>
+        <option value="template">Part 1: template workflow and repair demonstration</option>
+      </select>
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" placeholder="Describe a small feature…">Add a health check endpoint</textarea>
+      <label for="failures">Failing test iterations before the fix <span id="maxit"></span></label>
+      <input id="failures" type="number" min="0" max="10" value="0">
+      <div class="hint">Part 1 presets control template failures. They do not force live Gemini to make or repair a bug. A value ≥ the repair budget exhausts the template run.</div>
+      <label for="dataset">Dataset reference (optional)</label>
+      <input id="dataset" placeholder="e.g. corpus-v1 — routed as infeasible">
+      <div class="row" style="margin-top:12px">
+        <button id="run">Run through all planes</button>
+        <button class="ghost" id="refresh">Refresh</button>
+      </div>
+      <div class="hint">Part 1 demonstration shortcuts (switches the workflow):</div>
+      <div class="presets">
+        <button class="ghost" data-p="Add a health check endpoint" data-f="0">Pass first try</button>
+        <button class="ghost" data-p="Add input validation to the signup form" data-f="2">Repair ×2</button>
+        <button class="ghost" data-p="Refactor the billing module" data-f="9">Budget exhausted</button>
+        <button class="ghost" data-p="Train a model on the corpus" data-f="0" data-d="corpus-v1">Infeasible</button>
+        <button class="ghost" data-p="   " data-f="0">Blank (rejected)</button>
+      </div>
+      <div class="err" id="err"></div>
+    </section>
+
+    <section>
+      <h2>Recent runs</h2>
+      <div class="runs" id="runs"><div class="empty">No runs yet.</div></div>
+    </section>
+
+    <section>
+      <h2>Schema-agnostic ingest (Plane 4)</h2>
+      <div class="hint" style="margin-top:0">Send an external agent event with arbitrary fields. Raw is retained before normalization, even when normalization fails.</div>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap">
+        <button class="ghost" id="ext-rich">Rich event</button>
+        <button class="ghost" id="ext-drift">Drifted fields</button>
+        <button class="ghost" id="ext-bad">Malformed</button>
+        <button class="ghost" id="retry">Retry failed</button>
+      </div>
+      <pre id="ext-out" style="display:none"></pre>
+    </section>
+  </div>
+
+  <div class="stack">
+    <div class="kpis" id="kpis"></div>
+
+    <section id="detail">
+      <h2>Run detail</h2>
+      <div class="empty" id="detail-empty">Submit a task or pick a recent run.</div>
+      <div id="detail-body" style="display:none">
+        <div class="mono" style="color:var(--mute);font-size:12px;margin-bottom:10px" id="ids"></div>
+        <div class="flow" id="flow"></div>
+        <h2>Agent stages (Plane 2)</h2>
+        <div class="stages" id="stages"></div>
+        <div class="grid2">
+          <div>
+            <h2>Repair loop</h2>
+            <div id="iters"></div>
+          </div>
+          <div>
+            <h2>Generated workspace files</h2>
+            <div id="files"></div>
+          </div>
+        </div>
+        <h2 style="margin-top:16px">Correlated telemetry for this trace (Plane 4)</h2>
+        <div id="telemetry"></div>
+      </div>
+    </section>
+
+    <div class="grid2">
+      <section><h2>Events by plane</h2><div id="byplane"></div></section>
+      <section><h2>Pipeline health</h2><div id="health"></div></section>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const PLANE_COLORS = {plane1_intake:"var(--p1)", plane2_agents:"var(--p2)", plane3_runtime:"var(--p3)", plane4_observability:"var(--p4)"};
+let current = null, config = null, runBusy = false;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const text = await res.text();
+  let body; try { body = JSON.parse(text); } catch { body = text; }
+  return {ok: res.ok, status: res.status, body};
+}
+
+function badge(state) {
+  const s = String(state || "").toLowerCase();
+  const cls = ["passed","handed_off","success","normalized","feasible","ok"].includes(s) ? "b-ok"
+    : ["error","rejected","failed","failed_budget_exhausted","infeasible"].includes(s) ? "b-fail"
+    : ["routed","cancelled","pending"].includes(s) ? "b-warn" : "b-info";
+  return `<span class="badge ${cls}">${esc(state)}</span>`;
+}
+
+async function loadConfig() {
+  const {body} = await api("/api/config");
+  config = body;
+  const o = body.observability || {};
+  $("chips").innerHTML = [
+    ["mode", body.execution_mode], ["agents", body.stage_client], ["router", body.router_mode],
+    ["bus", o.bus], ["store", o.store], ["normalizer", o.normalizer],
+  ].map(([k,v]) => `<span class="chip">${k} <i>${esc(v)}</i></span>`).join("");
+  $("maxit").textContent = `(repair budget: ${body.repair_max_iterations})`;
+}
+
+async function loadMetrics() {
+  const {body: m} = await api("/observability/metrics");
+  const runs = await api("/api/runs?limit=200");
+  const list = Array.isArray(runs.body) ? runs.body : [];
+  const agentRuns = list.filter(r => r.engine);
+  const passed = agentRuns.filter(r => r.outcome === "passed").length;
+  const k = [
+    ["Runs", list.length],
+    ["Pass rate", agentRuns.length ? Math.round(100 * passed / agentRuns.length) + "%" : "–"],
+    ["Repair iterations", m.totals.repair_iterations],
+    ["Raw events", m.totals.raw_events],
+    ["Canonical", m.totals.canonical_events],
+    ["Normalization", m.normalization.success_rate == null ? "–" : Math.round(m.normalization.success_rate * 1000) / 10 + "%"],
+  ];
+  $("kpis").innerHTML = k.map(([l,v]) => `<div class="kpi"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join("");
+
+  const max = Math.max(1, ...Object.values(m.events_by_plane));
+  $("byplane").innerHTML = Object.keys(m.events_by_plane).length ? Object.entries(m.events_by_plane).sort().map(([p,c]) =>
+    `<div class="bar" style="--c:${PLANE_COLORS[p]||"var(--accent)"}"><span class="n">${esc(p)}</span><span class="track"><span class="fill" style="display:block;width:${100*c/max}%"></span></span><span class="c">${c}</span></div>`
+  ).join("") : `<div class="empty">No telemetry yet.</div>`;
+
+  const pc = m.pipeline_counters || {};
+  const rows = [
+    ["Accepted (raw stored)", pc.accepted || 0], ["Duplicates absorbed", pc.duplicate || 0],
+    ["Conflicting event_id", pc.conflict || 0], ["Envelope rejected", pc.rejected || 0],
+    ["Normalized", m.normalization.normalized], ["Normalization failed (raw kept)", m.normalization.failed],
+    ["Retries", pc.retries || 0],
+    ["Canonical SUCCESS / FAILED / ERROR", `${m.canonical_status.SUCCESS} / ${m.canonical_status.FAILED} / ${m.canonical_status.ERROR}`],
+    ["Runtime ops · avg ms", m.runtime_latency_ms.count ? `${m.runtime_latency_ms.count} · ${m.runtime_latency_ms.avg}` : "–"],
+  ];
+  $("health").innerHTML = `<table>${rows.map(([a,b]) => `<tr><td>${esc(a)}</td><td class="mono" style="text-align:right">${esc(b)}</td></tr>`).join("")}</table>`;
+
+  $("runs").innerHTML = list.length ? list.slice(0, 15).map(r => `
+    <div class="r ${current && current.task_id === r.task_id ? "on" : ""}" data-id="${esc(r.task_id)}">
+      <div class="p">${badge(r.outcome)} ${esc(r.prompt)}</div>
+      <div class="m">${esc((r.created_at||"").slice(11,19))} · ${esc(r.execution_mode)} · ${r.iterations} iteration(s)${r.devops_ran ? " · DevOps ✓" : ""}</div>
+    </div>`).join("") : `<div class="empty">No runs yet.</div>`;
+  document.querySelectorAll(".runs .r").forEach(el => el.onclick = () => openRun(el.dataset.id));
+}
+
+async function openRun(id) {
+  if (runBusy) return;
+  const {ok, body} = await api(`/api/runs/${encodeURIComponent(id)}`);
+  if (ok) { await render(body); loadMetrics(); }
+}
+
+function planeCard(name, color, status, detail) {
+  return `<div class="plane" style="--c:${color}"><div class="t">${esc(name)}</div><div class="s">${status}</div><div class="d">${detail}</div></div>`;
+}
+
+async function render(rec) {
+  current = rec;
+  $("detail-empty").style.display = "none";
+  $("detail-body").style.display = "";
+  const intake = rec.intake || {}, agents = rec.agents, det = rec.details || {};
+  $("ids").innerHTML = `task_id ${esc(rec.task_id || "—")} · trace_id ${esc(rec.trace_id)} · ${esc(rec.duration_ms)} ms`;
+  const reasons = (intake.reasons || []).join("; ");
+  const feas = intake.feasibility ? `feasibility ${esc(intake.feasibility.status)} · router ${esc(intake.feasibility.router)}<br>${esc(reasons)}` : esc(reasons);
+  const iters = agents ? agents.iterations.length : 0;
+  $("flow").innerHTML = [
+    planeCard("1 · Intake & trigger", "var(--p1)", badge(intake.status), feas),
+    planeCard("2 · Agent orchestration", "var(--p2)", agents ? badge(agents.state) : "—",
+      agents ? `${esc(agents.engine)} · ${iters} iteration(s) · DevOps ${agents.devops_ran ? "ran" : "did not run"}` : "Not started: intake did not approve this request. See its reason."),
+    planeCard("3 · Sandboxed runtime", "var(--p3)", agents ? `<span class="badge b-info">${esc(det.runtime_backend || "—")}</span>` : "—",
+      agents ? (det.runtime_error ? esc(det.runtime_error) : (iters ? `${agents.execution_kind} · host execution: ${agents.host_execution}` : "No test result recorded; see the agent error below.")) : "Not started because the task did not reach the agents."),
+    planeCard("4 · Observability", "var(--p4)", `<span id="obs-badge">…</span>`, `<span id="obs-detail"></span>`),
+  ].join("");
+
+  const order = ["Requirements","Planning","Architecture","Development","Testing","DevOps"];
+  const byStage = {};
+  (agents ? agents.stages : []).forEach(s => byStage[s.stage] = s);
+  $("stages").innerHTML = order.map(n => {
+    const s = byStage[n];
+    return `<div class="stage ${s ? "" : "off"}"><b>${esc(n)}</b><p>${s ? esc(s.summary) : (agents ? "not reached" : "—")}</p></div>`;
+  }).join("");
+
+  $("iters").innerHTML = agents && agents.iterations.length ? `<table><tr><th>#</th><th>Result</th><th>Developer artifact</th><th>Tester feedback</th></tr>${
+    agents.iterations.map(i => `<tr><td class="mono">${i.iteration}</td><td>${badge(i.passed ? "passed" : "failed")}</td><td class="mono">${esc(i.diff_summary)}</td><td class="mono">${esc((i.tester_feedback||"").slice(-300))}</td></tr>`).join("")
+  }</table><div class="hint">${esc(agents.termination_reason)}</div>` : `<div class="empty">${agents ? esc(agents.termination_reason) : esc(reasons || "The task was not handed to the agents.")}</div>`;
+
+  const files = det.generated_files || [];
+  $("files").innerHTML = files.length ? files.map(f => `<div class="mono" style="font-size:12px;margin-top:6px">${esc(f.path)}</div><pre>${esc(f.content)}</pre>`).join("")
+    : `<div class="empty">${rec.execution_mode !== "simulation" ? "No files were generated." : "Simulation mode writes no files."}</div>`;
+
+  const {body: trace} = await api(`/observability/traces/${encodeURIComponent(rec.trace_id)}`);
+  const evs = trace.events || [];
+  const failed = evs.filter(e => e.raw.normalization_status === "failed").length;
+  const pending = evs.filter(e => e.raw.normalization_status === "pending").length;
+  $("obs-badge").innerHTML = badge(!evs.length ? "pending" : (failed ? "failed" : (pending ? "pending" : "normalized")));
+  $("obs-detail").textContent = `${evs.length} raw · ${evs.filter(e => e.canonical).length} canonical · ${failed} failed`;
+  $("telemetry").innerHTML = evs.length ? `
+    <table><tr><th>Time</th><th>Plane</th><th>Event</th><th>Canonical job</th><th>Status</th><th>Normalization</th></tr>
+    ${evs.map((e,i) => `<tr class="click" data-i="${i}"><td class="mono">${esc(e.raw.occurred_at.slice(11,23))}</td>
+      <td><span class="badge" style="color:${PLANE_COLORS[e.raw.source]};background:#0000">${esc(e.raw.source)}</span></td>
+      <td class="mono">${esc(e.raw.event_name)}</td><td class="mono">${esc(e.canonical ? e.canonical.job : "—")}</td>
+      <td>${e.canonical ? badge(e.canonical.status) : "—"}</td><td>${badge(e.raw.normalization_status)}</td></tr>
+      <tr style="display:none" id="ev-${i}"><td colspan="6"><div class="grid2"><div><div class="hint">RAW (retained first)</div><pre>${esc(JSON.stringify(e.raw.envelope, null, 2))}</pre></div>
+      <div><div class="hint">CANONICAL (FOAP schema v${esc(e.canonical ? e.canonical.schema_version : "–")})</div><pre>${esc(e.canonical ? JSON.stringify(Object.fromEntries(Object.entries(e.canonical).filter(([k]) => k !== "raw")), null, 2) : e.raw.last_error)}</pre></div></div></td></tr>`).join("")}
+    </table><div class="hint">Click a row to compare the raw and canonical records.</div>` : `<div class="empty">No telemetry for this trace.</div>`;
+  document.querySelectorAll("#telemetry tr.click").forEach(tr => tr.onclick = () => {
+    const row = $("ev-" + tr.dataset.i); row.style.display = row.style.display === "none" ? "" : "none";
+  });
+}
+
+async function submit() {
+  if (runBusy) return;
+  runBusy = true;
+  $("err").textContent = "";
+  $("run").disabled = true; $("run").textContent = "Running…";
+  $("variant").disabled = true;
+  document.querySelectorAll(".presets button").forEach(b => b.disabled = true);
+  current = null;
+  $("detail-body").style.display = "none";
+  $("detail-empty").style.display = "";
+  $("detail-empty").textContent = "Processing this request. Live agents can take several minutes. Please wait for the result before submitting another task.";
+  try {
+    const body = {prompt: $("prompt").value, simulated_failures: $("variant").value === "template" ? Number($("failures").value || 0) : 0, run_variant: $("variant").value};
+    if ($("dataset").value.trim()) body.dataset = $("dataset").value.trim();
+    const res = await api("/api/runs", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
+    if (res.body && res.body.trace_id) await render(res.body);
+    if (!res.ok) $("err").textContent = (res.body.reasons || res.body.intake?.reasons || ["Request rejected"]).join("; ");
+    await loadMetrics();
+  } catch (e) { $("err").textContent = String(e); }
+  finally {
+    runBusy = false; $("run").disabled = false; $("run").textContent = "Run through all planes";
+    $("variant").disabled = false;
+    document.querySelectorAll(".presets button").forEach(b => b.disabled = false);
+    updateVariant();
+    if (!current) $("detail-empty").textContent = "No run result was received. Check the message beside the form, refresh Recent runs, and retry only if no completed run appears.";
+  }
+}
+
+async function ext(payload) {
+  const res = await api("/observability/ingest", {method: "POST", headers: {"content-type": "application/json"}, body: typeof payload === "string" ? payload : JSON.stringify(payload)});
+  $("ext-out").style.display = ""; $("ext-out").textContent = JSON.stringify(res.body, null, 2);
+  loadMetrics();
+}
+
+$("run").onclick = submit;
+function updateVariant() { $("failures").disabled = $("variant").value !== "template"; }
+$("variant").onchange = updateVariant;
+updateVariant();
+$("refresh").onclick = () => { loadMetrics(); if (current) openRun(current.task_id); };
+document.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
+  if (runBusy) return;
+  $("variant").value = "template"; updateVariant();
+  $("prompt").value = b.dataset.p; $("failures").value = b.dataset.f; $("dataset").value = b.dataset.d || ""; submit();
+});
+$("ext-rich").onclick = () => ext({actor_id: "planner-agent", target_id: "coder-agent", event_type: "Handoff", action: "delegate", status: "success", latency_ms: 42, span_id: "sp-1", tool_name: "search", metadata: {tokens: 812}});
+$("ext-drift").onclick = () => ext({agent_id: "qa-agent", kind: "TEST", outcome: "failed", elapsed_ms: 1310, data_size_kb: 3.5, extra_field: "kept in raw"});
+$("ext-bad").onclick = () => ext("<<not json: agent crashed mid-write>>");
+$("retry").onclick = async () => { const r = await api("/observability/retry?normalizer=configured", {method: "POST"}); $("ext-out").style.display = ""; $("ext-out").textContent = JSON.stringify(r.body, null, 2); loadMetrics(); };
+
+loadConfig().then(loadMetrics);
+setInterval(loadMetrics, 10000);
+</script>
+</body>
+</html>

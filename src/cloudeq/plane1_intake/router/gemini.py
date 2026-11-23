@@ -17,6 +17,7 @@ from cloudeq.shared.contracts.models import (
     RouterKind,
     RoutingRequest,
 )
+from cloudeq.shared.http_retry import post_json_with_retry
 from cloudeq.shared.ports.protocols import GeminiTransport
 
 _MODEL_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
@@ -62,11 +63,12 @@ class HttpxGeminiTransport:
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
         try:
-            response = self._http().post(
+            response = post_json_with_retry(
+                self._http(),
                 url,
                 headers={"x-goog-api-key": api_key, "content-type": "application/json"},
-                json=body,
-                timeout=self._timeout,
+                body=body,
+                timeout_seconds=self._timeout,
             )
         except httpx.TimeoutException as exc:
             raise GeminiTimeout("Gemini router timed out") from exc
@@ -119,6 +121,13 @@ class GeminiRouter:
             return _error(model_id, "Gemini router timed out.")
         except GeminiCallError as exc:
             code = "unknown" if exc.status_code is None else str(exc.status_code)
+            if exc.status_code in {500, 502, 503, 504}:
+                return _error(
+                    model_id,
+                    f"Gemini feasibility check is temporarily unavailable (HTTP {code}) "
+                    "after bounded retries. Wait briefly and submit again. "
+                    "Agents and runtime were not started.",
+                )
             return _error(model_id, f"Gemini router failed with status {code}.")
         parsed = _parse_model_json(raw, model_id=model_id)
         if parsed is None:
