@@ -65,7 +65,9 @@ separate branch does not change `main` until an integration merge is made.
 
 ## Submission rule
 
-Until the integration is merged, use the **branch-specific URL and clone command
-in README.md**. A default clone of the old `main` would omit completed work.
-Making the repository public later changes access, not which branch is checked
-out. Actual keys and local `.env` files are intentionally excluded from submission.
+PR #6 was merged as `30cfb625b965a2023a896bed359336dc7b6ca0e1` on November 23,
+2026. Its tree matched the completed deployment branch. The repository was
+confirmed public on November 24. Use the normal repository URL and clone command
+in README.md: the default `main` now contains the completed project. The older
+`main` comparison above is historical evidence of the work brought in by that merge.
+Actual keys and local `.env` files are intentionally excluded from submission.

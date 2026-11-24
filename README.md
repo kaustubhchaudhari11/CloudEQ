@@ -5,7 +5,20 @@ Team: **Cloud EQ**. Repository/package identifiers remain `CloudEQ` / `cloudeq`.
 
 ## Submission source and status
 
-The complete Drive project plus our deployment fixes is on **`deploy/render-full-stack`**. Use the branch-specific clone command below. At the November 23 check, `main` still contained the older Plane 3 milestone. See [source provenance](docs/SOURCE_PROVENANCE.md) for the comparison.
+**Submission repository: [github.com/kaustubhchaudhari11/CloudEQ](https://github.com/kaustubhchaudhari11/CloudEQ)**
+
+The public **`main`** branch contains the complete Drive project plus the deployment fixes, merged in pull request #6. A normal clone or a download of `main` contains the complete application, tests, dependency lockfile, configuration template, and documentation. See [source provenance](docs/SOURCE_PROVENANCE.md) for the recorded comparison.
+
+**[Read or download the user manual (PDF)](docs/FORGE-SPAN-User-Manual.pdf)** — installation, features, main workflow, additional scenarios, and screenshots. This is the team's supplied November 17–21 local-demonstration edition, preserved unchanged. Use this README for current clone/install commands, model configuration, runtime packages, and fixes made after that edition; its historical model IDs, test totals, and UI limitations are not promises about the current release.
+
+### For the evaluator
+
+1. Follow **sections 1–3** to install and run the offline demonstration. No API key, Docker, or paid hosting account is required for this first check. Initial dependency installation needs internet access.
+2. Follow **section 4** for deterministic agents with actual local container tests.
+3. Follow **section 5** for live CrewAI/Gemini generation using your own key and Docker. This workflow can also be demonstrated locally during the presentation.
+4. Use **sections 6–7** to inspect observability and run automated checks.
+
+The offline demonstration verifies the workflow and repair/control paths with simulated stage/test outputs. It does **not** verify live model generation or actual generated-code execution. Real API keys are intentionally absent; all required local variable names and examples are documented below and in [`.env.example`](.env.example).
 
 All four planes and the integrated dashboard are implemented:
 
@@ -30,16 +43,16 @@ Hosted demo: <https://forge-span.onrender.com>. Local evaluation requires no Ren
 
 ## 2. Download and install
 
-The repository is private until the team changes its visibility; private access requires an invitation and your own GitHub account. No team credentials are included.
+The repository is public and can be cloned without a collaborator invitation. No team credentials are included.
 
 ```text
-git clone --branch deploy/render-full-stack --single-branch https://github.com/kaustubhchaudhari11/CloudEQ.git FORGE-SPAN
+git clone https://github.com/kaustubhchaudhari11/CloudEQ.git FORGE-SPAN
 cd FORGE-SPAN
 uv python install 3.12
 uv sync --locked --python 3.12
 ```
 
-For a ZIP, select `deploy/render-full-stack` on GitHub before **Code → Download ZIP**. Extract it, open a terminal in the directory containing `pyproject.toml`, then run the two `uv` commands. No developer-specific absolute path is needed.
+For a ZIP, select **`main`** on GitHub before **Code → Download ZIP**, or [download main directly](https://github.com/kaustubhchaudhari11/CloudEQ/archive/refs/heads/main.zip). Extract it, open a terminal in the directory containing `pyproject.toml`, then run the two `uv` commands. No developer-specific absolute path is needed.
 
 Create `.env` once from the supplied template. Do not replace an existing file.
 
@@ -65,7 +78,7 @@ Keep the copied `.env` defaults and run:
 uv run --locked cloudeq-server
 ```
 
-Open <http://127.0.0.1:8000>. Select **Part 1: template workflow and repair demonstration** and submit `Add a health check`. In `simulation` execution mode, the workflow and telemetry are real application behavior but test outcomes are simulated. Expect `simulation=true`, `live_gemini=false`, and `host_execution=false`.
+Open **<http://localhost:8000>** (equivalently <http://127.0.0.1:8000>). Select **Part 1: template workflow and repair demonstration** and submit `Add a health check`. In `simulation` execution mode, the workflow and telemetry are real application behavior but test outcomes are simulated. Expect `simulation=true`, `live_gemini=false`, and `host_execution=false`.
 
 The repair budget defaults to three attempts. **Repair ×2** fails twice and passes on the third attempt. **Budget exhausted** fails all three and skips DevOps. **Blank (rejected)** demonstrates validation. **Infeasible** uses an unknown dataset; there is no dataset catalog.
 
@@ -74,6 +87,8 @@ Terminal-only demonstration of these five scenarios:
 ```text
 uv run --locked cloudeq-demo
 ```
+
+This command runs the five scenarios and two external telemetry examples in a temporary local store. Expected results are two successful workflows, one exhausted repair budget with no DevOps, one infeasible request, and one rejected blank request. The malformed telemetry example intentionally fails normalization while keeping its raw event. The offline run rechecked on **November 24, 2026** exited successfully with **79 raw events, 78 canonical records, one expected normalization failure, and no pending events**. Generated IDs vary between runs. CLI demo records are temporary; use the dashboard buttons to create results visible in its Recent runs list.
 
 Stop the web server with **Ctrl+C** before changing modes.
 
@@ -140,6 +155,8 @@ Allow time for sequential model stages and container tests. A successful live ru
 ## 6. Observability and optional service stack
 
 Local defaults use an in-process event bus and SQLite, with no extra service. The **Rich event**, **Drifted fields**, and **Malformed** ingest examples demonstrate successful normalization and preserved raw data on normalization failure. **Retry failed** processes retained failures again. Trace IDs connect activity across the planes.
+
+To inspect an event from the manual's telemetry scenario, copy its `trace_id` and open `http://localhost:8000/observability/traces/TRACE_ID`, replacing `TRACE_ID` with that value. Successful normalization and a source event whose status is `FAILED` can coexist: one describes processing, the other the original event.
 
 To run Kafka, MongoDB, and Grafana locally, stop any host server on port 8000, then run:
 
@@ -210,4 +227,4 @@ Default data locations are `~/.cloudeq/runs.jsonl`, `~/.cloudeq/observability.sq
 - [References](docs/references/README.md), [architecture contracts](docs/architecture/contracts.md), [requirements](docs/requirements.md), and [project identity](docs/PROJECT_IDENTITY.md).
 - [Cloud demonstration](docs/CLOUD_DEMO.md) and [Render deployment](docs/RENDER_DEPLOYMENT.md).
 
-Submit the complete source branch and ensure the evaluator can access it. Do not submit only the hosted URL or include your real `.env` file.
+For submission, use **https://github.com/kaustubhchaudhari11/CloudEQ**. The default `main` branch is the evaluation entry point. The hosted demo is optional; the source and instructions support local evaluation. Do not include your real `.env` file or API key in the submission.

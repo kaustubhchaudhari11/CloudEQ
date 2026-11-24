@@ -2,15 +2,16 @@
 
 Repository: https://github.com/kaustubhchaudhari11/CloudEQ
 
-Accept your GitHub collaborator invitation before cloning the private repository.
-Each teammate should use their own GitHub account and their own local working copy.
+The repository is public for evaluation; cloning does not require an invitation.
+Write access still requires collaborator authorization. Each teammate should use
+their own GitHub account and their own local working copy.
 Do not share tokens, passwords, `.env` files, or local virtual environments.
 
 ## Team workflow
 
 1. Read the Cursor rules and source requirements before implementation.
-2. Until the completed integration is merged, start from `deploy/render-full-stack`;
-   afterwards use an up-to-date `main`. Create one focused task branch, such as
+2. Start from an up-to-date `main`. The completed integration was merged in PR #6.
+   Create one focused task branch, such as
    `feature/plane1-intake`, `feature/agent-engine`, or `fix/telemetry-retry`.
 3. Keep changes within the assigned task; coordinate shared contract changes first.
 4. Run relevant checks, inspect the diff, and commit with a descriptive message.
@@ -22,7 +23,7 @@ Do not share tokens, passwords, `.env` files, or local virtual environments.
 ## Initial clone
 
 ```powershell
-git clone --branch deploy/render-full-stack https://github.com/kaustubhchaudhari11/CloudEQ.git
+git clone https://github.com/kaustubhchaudhari11/CloudEQ.git
 cd CloudEQ
 git switch -c feature/your-task
 ```
@@ -35,8 +36,7 @@ reported by `git rev-parse --show-toplevel` should be your CloudEQ folder.
 
 Configuration lives in `pyproject.toml` and `uv.lock`. Development tools install
 into the project-local `.venv` only. All four planes and the integrated dashboard
-are present on `deploy/render-full-stack`; start from that branch until its
-integration pull request is merged. Use the verification commands in `README.md`.
+are present on `main`. Use the verification commands in `README.md`.
 Distinguish offline/mocked checks from real Docker, provider, and service checks.
 Do not add a CI workflow that reports success while skipping all real verification.
 

@@ -3,7 +3,7 @@
 ## Current evaluation entry point — November 23, 2026
 
 Use the root README for current setup and execution instructions. The complete
-Drive project plus deployment corrections is on `deploy/render-full-stack`.
+Drive project plus deployment corrections was merged into `main` in PR #6.
 All four planes and the integrated dashboard are present. Current evidence and
 remaining provider limitations are in `DEPLOYMENT_VERIFICATION.md`; source lineage
 is in `SOURCE_PROVENANCE.md`.
