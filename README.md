@@ -70,6 +70,18 @@ test -e .env || cp .env.example .env
 
 The template contains offline defaults and empty secrets. The app loads `.env` from the current working directory; existing process environment variables take precedence. Restart the server after changes. Never commit `.env`, passwords, or keys.
 
+On Windows, the checkout-aware launcher below always starts from its own project
+folder, installs locked dependencies, and reports an existing FORGE SPAN server
+instead of trying to start a second one on the same port:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
+```
+
+Use the launcher from the updated GitHub checkout, not an earlier extracted Drive
+copy. The mode comes from `.env`; this launcher does not silently enable paid API
+calls. If it finds a running server, it prints that server's current agent mode.
+
 ## 3. First check: no key or Docker required
 
 Keep the copied `.env` defaults and run:
@@ -287,6 +299,12 @@ See [dated verification results](docs/DEPLOYMENT_VERIFICATION.md). A skipped che
 - **Missing Flask:** rebuild `infra/runtime/Dockerfile`; it includes Flask. Arbitrary generated package-install commands are not supported.
 - **Port occupied:** stop the other server or use `cloudeq-server --port 8001`.
 - **Old settings:** process environment values override `.env`; use a fresh terminal and restart the server after edits.
+- **MongoDB connection refused / `ServerSelectionTimeoutError`:** installing
+  `pymongo` only installs a client. MongoDB must also be running at `MONGODB_URI`.
+  For the standalone local profile, set `CLOUDEQ_OBSERVABILITY_STORE=sqlite` and
+  `CLOUDEQ_TELEMETRY_BUS=inprocess`, then restart. These settings do not disable
+  live CrewAI/Gemini agents. If using MongoDB deliberately, start the service and
+  match its published port (the supplied Compose file uses 27017).
 - Generated projects are reviewable files and test results, not automatically published websites. Generated Git commit/push operations are disabled.
 - Ticket adapters and a dataset catalog are not implemented. Retention deletion is not configured. Historical normalization failures remain visible and are not counted as successes.
 
