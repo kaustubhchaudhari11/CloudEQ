@@ -117,6 +117,12 @@ Containers have no network, no application keys, a non-root user, a read-only ta
 
 ## 5. Part 2: live CrewAI and Gemini locally
 
+**Localhost is not the same as offline.** A browser at `http://localhost:8000`
+can use real CrewAI and Gemini: the application runs on your computer while model
+requests go over the internet to Gemini. Truly offline simulation makes no LLM
+calls. Setting an API key while leaving `CLOUDEQ_EXECUTION_MODE=simulation` does
+not turn the simulation into live generation.
+
 Complete section 4 first. Obtain your own key through [Google AI Studio](https://aistudio.google.com/apikey), following [Google's key setup instructions](https://aistudio.google.com/docs/api-key). Usage may require quota or billing. Keep the key only in your local configuration.
 
 Edit these `.env` values:
@@ -151,6 +157,73 @@ Allow time for sequential model stages and container tests. A successful live ru
 - `host_execution=false`, because tests ran inside the isolated environment.
 
 **Part 1 presets switch the workflow to Part 1.** They do not test Gemini or force it to generate a bug. A missing live configuration can select the template client; check the labels and flags. Use `cloudeq-server` for the integrated live workflow. The earlier `cloudeq-agents` CLI is an offline/boundary demonstration.
+
+### Step-by-step live pipeline for local evaluation
+
+1. **Prepare the application.** Clone `main` and run the installation commands in
+   section 2. Create `.env` from `.env.example` once. Never copy someone else's key.
+2. **Prepare test execution.** Start Docker, verify `docker info`, and build the
+   image with the exact section 4 command. Keep the application running on the
+   host; the Compose application itself intentionally uses simulation.
+3. **Enable live agents.** Apply the section 5 `.env` block, supply your own key,
+   and verify the explicit model ID is available to it. The required combination
+   is execution mode `docker`, agent engine `crewai`, live calls `true`, a key,
+   and a model. Start a fresh terminal so older environment overrides do not win.
+4. **Start the integrated server.** From the repository root run
+   `uv run --locked cloudeq-server --host 127.0.0.1 --port 8000` and open
+   `http://localhost:8000`. `/health` should report `execution_mode: docker`,
+   `stage_client: CrewAI + Gemini (live)`, `live_gemini: true`, and
+   `docker_engine_available: true`. These establish readiness, not a completed run.
+5. **Select the live workflow.** Choose **Part 2: configured agents**, leave the
+   dataset empty, and paste the health-check prompt above. Click **Run through all
+   planes** once. Do not click Part 1 presets: those deliberately select templates.
+6. **Plane 1 — intake.** The request is validated and receives task/trace IDs.
+   Feasible input is handed to the supervisor. Empty input is rejected; an unknown
+   dataset is routed as infeasible. The recommended initial profile uses an offline
+   feasibility router while the subsequent agent stages still call live Gemini.
+7. **Plane 2 — planning and development.** The supervisor runs Requirements,
+   Planning, Architecture, and Development sequentially. Each live stage builds a
+   CrewAI crew backed by the configured Gemini model and validates its structured
+   output. Development must supply implementation files and pytest tests. Stage
+   summaries are recorded separately; this implementation does not pass a complete
+   accumulated design document between every role. It supplies the original prompt
+   and, during repairs, prior runtime feedback to each stage.
+8. **Plane 3 — execute tests.** Validated relative files are written to the task
+   directory outside the repository. The Testing stage requests exactly
+   `python -m pytest`. Docker executes it with network disabled, no application
+   credentials, a non-root user, a read-only task mount, and resource/time limits.
+   The real exit code and output determine pass/fail, not an LLM's claim.
+9. **Repair or finish.** A failing test sends runtime feedback back to Development,
+   then Testing runs again, up to the configured three-attempt budget. A pass
+   permits DevOps; exhaustion or a provider/runtime error prevents successful
+   completion. DevOps produces a stage summary, not a deployment or Git push.
+10. **Plane 4 — inspect evidence.** Events from the workflow share the trace ID.
+    The local in-process/SQLite profile retains raw records before offline
+    normalization and keeps canonical records separately. The optional Kafka,
+    MongoDB, and Gemini-normalizer configurations are described in section 6 and
+    above. Scroll to the generated files, iterations, and correlated trace, or open
+    `/api/runs/TASK_ID` and `/observability/traces/TRACE_ID` with the returned IDs.
+11. **Confirm a live success.** Check `passed`, all six stages, `live_crewai=true`,
+    `live_gemini=true`, `simulation=false`, actual pytest output, and
+    `host_execution=false`. Old simulation runs remain in Recent runs; inspect the
+    new task's own flags. A 503 or timeout is a failed provider attempt, not a live
+    success. Retry later rather than presenting a simulated pass as a live run.
+
+If the header still says **mode simulation / offline simulation (no LLM)**, stop
+that server, verify you edited `.env` in the directory used to start it, remove
+stale process overrides by opening a fresh terminal, and restart. Refresh the
+browser and select Part 2 again. Merely changing the dropdown cannot change the
+server's execution mode. You can keep routing/normalization offline while live
+CrewAI agents run; those are independently configured components.
+
+**Alternative when Docker is unavailable:** the existing Render runtime adapter
+can execute tests remotely while the dashboard and CrewAI still run at localhost.
+This is a hybrid deployment, not offline or fully local execution: its header says
+`mode render`, agents remain live, and runtime results say `render-sandbox`.
+It requires a Render account and private runtime credentials, the `render` extra,
+and the trusted pytest/Flask wheel bundle described in
+[Render deployment](docs/RENDER_DEPLOYMENT.md). Remote test usage may incur charges.
+The default TA instructions above use Docker and need no Render account.
 
 ## 6. Observability and optional service stack
 
@@ -208,6 +281,9 @@ See [dated verification results](docs/DEPLOYMENT_VERIFICATION.md). A skipped che
 - **429 / 401 / 403 / 404:** check quota, local key configuration, account permissions, and model availability. Do not disclose the key.
 - **No handoff:** inspect the intake rejection/feasibility reason first.
 - **No actual execution:** check `docker info`, the built image, the mode, and the runtime error. Keep the task workspace outside the repository.
+- **Docker reports a read-only data filesystem:** this is a Docker/WSL storage
+  problem, not a Gemini setting. Follow [Docker's troubleshooting guidance](https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/).
+  Do not delete Docker volumes or reset its data merely to run this demonstration.
 - **Missing Flask:** rebuild `infra/runtime/Dockerfile`; it includes Flask. Arbitrary generated package-install commands are not supported.
 - **Port occupied:** stop the other server or use `cloudeq-server --port 8001`.
 - **Old settings:** process environment values override `.env`; use a fresh terminal and restart the server after edits.
